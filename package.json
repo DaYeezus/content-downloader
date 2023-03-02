@@ -1,9 +1,16 @@
 {
-    "name": "album-downloader",
-    "version": "1.0.0",
-    "description": "album downloader application contains cli , web app and api",
-    "license": "ISC",
-    "devDependencies": {
-        "nx": "^15.8.1"
-    }
+  "name": "album-downloader",
+  "version": "1.0.0",
+  "description": "album downloader application contains cli , web app and api",
+  "license": "ISC",
+  "devDependencies": {
+    "nx": "^15.8.1"
+  },
+  "scripts": {
+    "dev:all": "pnpm --stream -r run dev",
+    "dev:server": "pnpm nx dev server",
+    "dev:client": "pnpm nx dev client",
+    "pretty:all": "prettier --write \"./**/**/*.{js,jsx,ts,tsx,json}\"",
+    "pretty:apps": "pnpm --stream -r run pretty"
+  }
 }

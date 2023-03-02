@@ -1,6 +1,6 @@
-import express, { Router } from "express";
-import { downloadPlaylist } from "../controllers/youtube.controller";
+import {Router} from "express";
+import {getContentInfo,} from "../controllers/youtube.controller";
 
 const router: Router = Router();
-router.get("/", downloadPlaylist);
-export { router as youtubeRouter };
+router.post("/", getContentInfo);
+export {router as youtubeRouter};

@@ -1,11 +1,12 @@
 {
-  "name": "album-downloader-validators",
+  "name": "validators",
   "private": true,
   "version": "1.0.0",
   "dependencies": {
     "zod": "^3.20.6"
   },
   "devDependencies": {
+    "typescript": "^4.9.5",
     "@types/node": "^18.14.2",
     "ts-node": "^10.9.1"
   }

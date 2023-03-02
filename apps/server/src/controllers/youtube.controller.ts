@@ -1,30 +1,35 @@
-import { Request, Response, NextFunction } from "express";
-import {
-  youtubeContentSchema,
-  youtubeContentType,
-} from "album-downloader-validators";
-import { BadRequest } from "http-errors";
-import { map, of } from "rxjs";
+import {NextFunction, Request, Response} from "express";
+import {youtubeContentSchema} from "validators";
+import {mergeMap, of} from "rxjs";
+import {getYoutubeContentInfo} from "../utils/youtube.utils";
+import {videoInfo} from "ytdl-core";
+
 export function downloadPlaylist(
-  req: Request,
-  res: Response,
-  next: NextFunction
+    req: Request,
+    res: Response,
+    next: NextFunction
 ) {
-  try {
-  } catch (err: any) {
-    next(err);
-  }
+    try {
+    } catch (err: any) {
+        next(err);
+    }
 }
 
-export function downloadSingleTrack(
-  req: Request,
-  res: Response,
-  next: NextFunction
+export async function getContentInfo(
+    req: Request,
+    res: Response,
+    next: NextFunction
 ) {
-  try {
-    const { link } = req.params;
-    of(youtubeContentSchema.parse(link)).pipe(map((link) => {}));
-  } catch (err: any) {
-    next(err);
-  }
+    try {
+        const {link} = await youtubeContentSchema.parseAsync(req.body);
+        getYoutubeContentInfo(link)
+            .pipe(
+                mergeMap((data: videoInfo) => {
+                    return of(res.send(data.videoDetails.title));
+                })
+            )
+            .subscribe();
+    } catch (err: any) {
+        next(err);
+    }
 }

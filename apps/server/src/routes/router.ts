@@ -1,5 +1,5 @@
-import express, { Router, Request, Response, response } from "express";
-import { youtubeRouter } from "./youtube.routes";
+import {Router} from "express";
+import {youtubeRouter} from "./youtube.routes";
 
 const router: Router = Router();
 router.use("/youtube", youtubeRouter);
