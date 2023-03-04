@@ -6,12 +6,6 @@
     "module": "commonjs",
     "outDir": "./dist"
   },
-  "include": [
-    "."
-  ],
-  "exclude": [
-    "dist",
-    "node_modules",
-    "**/*.spec.ts"
-  ]
+  "include": ["."],
+  "exclude": ["dist", "node_modules", "**/*.spec.ts"]
 }
