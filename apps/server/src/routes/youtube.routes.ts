@@ -1,8 +1,14 @@
 import { Router } from "express";
-import {downloadContent, getContentInfo} from "../controllers/youtube.controller";
+import {
+  downloadFromPlaylist,
+  downloadFromVideo,
+  getContentInfo,
+} from "../controllers/youtube.controller";
+import { downloadContentFromPlaylistSchema } from "validators";
 
 const router: Router = Router();
 
 router.post("/", getContentInfo);
-router.post("/download", downloadContent);
+router.post("/video", downloadFromVideo);
+router.post("/playlist", downloadFromPlaylist);
 export { router as youtubeRouter };

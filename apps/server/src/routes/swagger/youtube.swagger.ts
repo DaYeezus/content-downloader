@@ -10,7 +10,20 @@
  *                  link:
  *                      type: string
  *                      description: YouTube content link
- *          downloadContent:
+ *          downloadVideo:
+ *              type:
+ *                  object
+ *              required:
+ *                  - link
+ *                  - isHighQuality
+ *              properties:
+ *                  link:
+ *                      type: string
+ *                      description: YouTube content link
+ *                  isHighQuality:
+ *                      type: boolean
+ *                      description: download high quality or low quality
+ *          downloadPlaylist:
  *              type:
  *                  object
  *              required:
@@ -26,8 +39,7 @@
  *                      description: download high quality or low quality
  *                  format:
  *                      type: string
- *                      enum: [mp3 , zip]
- *                      description: the format to download
+ *                      enum: [zip , mp3]
  */
 
 /**
@@ -49,16 +61,34 @@
 
 /**
  * @swagger
- *  /api/youtube/download/:
+ *  /api/youtube/video/:
  *      post:
  *          tags: [Youtube]
- *          summary: download youtube content
+ *          summary: download youtube video as mp3
  *          requestBody:
  *              required: true
  *              content:
  *                  application/x-www-form-urlencoded:
  *                      schema:
- *                          $ref: '#/components/schemas/downloadContent'
+ *                          $ref: '#/components/schemas/downloadVideo'
+ *          responses:
+ *              200:
+ *                  description: success
+ *
+ */
+
+/**
+ * @swagger
+ *  /api/youtube/playlist/:
+ *      post:
+ *          tags: [Youtube]
+ *          summary: download youtube playlist as a zip or mp3
+ *          requestBody:
+ *              required: true
+ *              content:
+ *                  application/x-www-form-urlencoded:
+ *                      schema:
+ *                          $ref: '#/components/schemas/downloadPlaylist'
  *          responses:
  *              200:
  *                  description: success

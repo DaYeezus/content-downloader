@@ -1,21 +1,29 @@
 import { z } from "zod";
-import { youtubeContentRegex } from "./regexes";
+import { youtubePlaylistRegex, youtubeVideoRegex } from "./regexes";
 
-export const youtubeContentLinkSchema = z
-  .string({
-    required_error: "Please insert the music link from youtube",
-  })
-  .regex(youtubeContentRegex);
-export type youtubeContentLinkSchema = z.infer<typeof youtubeContentLinkSchema>;
 export const getYoutubeInfoSchema = z.object({
-  link: youtubeContentLinkSchema,
+  link: z
+    .string({
+      required_error: "Please insert the music link from youtube",
+    })
+    .regex(youtubeVideoRegex),
 });
 export type getYoutubeInfoType = z.infer<typeof getYoutubeInfoSchema>;
-export const downloadYoutubeContentSchema = z.object({
-  link: youtubeContentLinkSchema,
+export const downloadContentFromVideoSchema = z.object({
+  link: z
+    .string({
+      required_error: "Please insert the music link from youtube",
+    })
+    .regex(youtubeVideoRegex),
+  isHighQuality: z.string().default("true"),
+});
+
+export const downloadContentFromPlaylistSchema = z.object({
+  link: z
+    .string({
+      required_error: "Please insert the music link from youtube",
+    })
+    .regex(youtubePlaylistRegex),
   isHighQuality: z.boolean().default(true),
   format: z.enum(["mp3", "zip"]),
 });
-export type downloadYoutubeContentType = z.infer<
-  typeof downloadYoutubeContentSchema
->;

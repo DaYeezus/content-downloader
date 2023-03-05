@@ -9,14 +9,28 @@ import {
 } from "./middlewares/server-errors";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpecs } from "./conf/swagger.conf";
-
+import compression from "compression";
+import helmet from "helmet";
+import cors from "cors";
 dotenv.config();
 const app: Express = express();
-// app.use(cors());
-// app.use(helmet());
+app.use(cors({ credentials: true, origin: process.env.CLIENT_ADDRESS }));
+app.use(helmet());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "short"));
+app.use(
+  compression({
+    level: 6,
+    threshold: 100 * 1000,
+    filter: (req, res) => {
+      if (req.headers["x-no-compression"]) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  })
+);
 app.use("/api", router);
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 app.use(notFoundHandler);
