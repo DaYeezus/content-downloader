@@ -1,20 +1,15 @@
 {
   "tasksRunnerOptions": {
     "default": {
-      "runner": 'nx/tasks-runners/default',
+      "runner": "nx/tasks-runners/default",
       "options": {
-        "cacheableOperations": [
-          'build',
-          'test'
-        ]
+        "cacheableOperations": ["build", "test"]
       }
     }
   },
   "targetDefaults": {
     "build": {
-      "inputs": [
-        '!{projectRoot}/**/*.md'
-      ]
+      "inputs": ["!{projectRoot}/**/*.md"]
     }
   }
-};
+}
