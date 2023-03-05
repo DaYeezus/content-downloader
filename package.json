@@ -4,7 +4,11 @@
   "description": "album downloader application contains cli , web app and api",
   "license": "ISC",
   "devDependencies": {
-    "nx": "^15.8.1"
+    "@typescript-eslint/eslint-plugin": "^5.54.0",
+    "eslint": "8.35.0",
+    "nx": "^15.8.1",
+    "prettier": "^2.8.4",
+    "typescript": "^4.9.5"
   },
   "scripts": {
     "dev:all": "pnpm --stream -r run dev",

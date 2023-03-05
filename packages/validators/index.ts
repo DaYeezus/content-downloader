@@ -1,1 +1,1 @@
-export * from "./youtube.validators";
+export * from './youtube.validators';
