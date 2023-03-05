@@ -4,16 +4,11 @@ import {
   downloadContentFromVideoSchema,
   getYoutubeInfoSchema,
 } from 'validators';
-import { map, mergeMap, of } from 'rxjs';
-
-import { videoInfo } from 'ytdl-core';
 import * as fs from 'fs';
 import * as path from 'path';
-import { FfmpegCommand } from 'fluent-ffmpeg';
 import {
   downloadSingleAudio,
   getPlaylistInfo,
-  getPlaylistItemsId,
   getYoutubeContentInfo,
 } from '../services/youtube.service';
 
@@ -24,26 +19,14 @@ export async function getContentInfo(
 ) {
   try {
     const { link } = await getYoutubeInfoSchema.parseAsync(req.body);
-    getYoutubeContentInfo(link)
-      .pipe(
-        mergeMap((data: videoInfo) => {
-          const videoDetails = {
-            title: data.videoDetails.title,
-
-            image:
-              data.videoDetails.thumbnails[
-                data.videoDetails.thumbnails.length - 1
-              ],
-            url: data.videoDetails.video_url,
-          };
-          return of(
-            res.status(200).json({
-              videoDetails,
-            }),
-          );
-        }),
-      )
-      .subscribe();
+    getYoutubeContentInfo(link).subscribe({
+      next(value) {
+        return res.status(200).json({
+          video: value,
+        });
+      },
+      error: (err) => next(err),
+    });
   } catch (err: any) {
     next(err);
   }
@@ -67,26 +50,25 @@ export async function downloadFromVideo(
       `${Math.floor(Math.random() * 1000000)}.mp3`,
     );
     // TODO : add download form info and get info from cached url that use redis
-    downloadSingleAudio(link, quality, filePath)
-      .pipe(
-        map((data: FfmpegCommand) => {
-          data.on('end', () => {
-            res.download(filePath, (err) => {
+    downloadSingleAudio(link, quality, filePath).subscribe({
+      next(data) {
+        data.on('end', () => {
+          res.download(filePath, (err) => {
+            if (err) {
+              console.error(err);
+            }
+
+            // Delete the temporary file from the server.
+            fs.unlink(filePath, (err) => {
               if (err) {
                 console.error(err);
               }
-
-              // Delete the temporary file from the server.
-              fs.unlink(filePath, (err) => {
-                if (err) {
-                  console.error(err);
-                }
-              });
             });
           });
-        }),
-      )
-      .subscribe();
+        });
+      },
+      error: (err) => next(err),
+    });
   } catch (err: any) {
     next(err);
   }
@@ -101,17 +83,12 @@ export async function downloadFromPlaylist(
     const { link } = await downloadContentFromPlaylistSchema.parseAsync(
       req.body,
     );
-    getPlaylistItemsId(link)
-      .pipe(
-        mergeMap((data) => {
-          return of(
-            res.status(200).json({
-              data
-            }),
-          );
-        }),
-      )
-      .subscribe();
+    getPlaylistInfo(link).subscribe({
+      next(value) {
+        return res.send(value.data);
+      },
+      error: (err) => next(err),
+    });
   } catch (err: any) {
     next(err);
   }

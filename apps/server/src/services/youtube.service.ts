@@ -1,10 +1,27 @@
 import axios, { AxiosResponse } from 'axios';
-import Ffmpeg from 'fluent-ffmpeg';
-import { from, Observable, of, map, mergeMap, catchError } from 'rxjs';
+import Ffmpeg, { FfmpegCommand } from 'fluent-ffmpeg';
+import { catchError, from, map, Observable, of } from 'rxjs';
 import ytdl, { videoInfo } from 'ytdl-core';
+import { HttpError } from 'http-errors';
 
-export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
-  return from(ytdl.getInfo(link));
+export function getYoutubeContentInfo(
+  link: string,
+): Observable<{ title: string; image: ytdl.thumbnail; url: string }> {
+  return from(ytdl.getInfo(link)).pipe(
+    map((data: videoInfo) => {
+      const videoDetails = {
+        title: data.videoDetails.title,
+
+        image:
+          data.videoDetails.thumbnails[data.videoDetails.thumbnails.length - 1],
+        url: data.videoDetails.video_url,
+      };
+      return videoDetails;
+    }),
+    catchError((err) => {
+      throw new HttpError(err);
+    }),
+  );
 }
 
 export function downloadSingleAudio(
@@ -22,6 +39,13 @@ export function downloadSingleAudio(
       .audioBitrate(isHightQUality ? 320 : 128)
       .toFormat(isHightQUality ? 'flac' : 'mp3')
       .save(filePath),
+  ).pipe(
+    map((data: FfmpegCommand) => {
+      return data;
+    }),
+    catchError((err) => {
+      throw new HttpError(err);
+    }),
   );
 }
 
@@ -29,16 +53,7 @@ export function downloadAudioFromPlaylist(
   link: string,
   isHightQUality: boolean,
   format: string,
-) {
-  //   await getPlaylistItemsId(link);
-  //   getPlaylistItemsId(link)
-  //     .pipe(
-  //       map((playListVideos) => {
-  //         downloadSingleAudio(link, isHightQUality);
-  //       }),
-  //     )
-  //     .subscribe();
-}
+) {}
 
 export function getPlaylistInfo(link: string): Observable<AxiosResponse> {
   const playlistId = getPlaylistId(link);
@@ -47,7 +62,14 @@ export function getPlaylistInfo(link: string): Observable<AxiosResponse> {
     axios.get(
       `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${apiKey}`,
     ),
-  ).pipe(map((response) => response));
+  ).pipe(
+    map((response) => {
+      return response;
+    }),
+    catchError((err) => {
+      throw new HttpError(err);
+    }),
+  );
 }
 
 export function getPlaylistItemsId(
@@ -62,6 +84,9 @@ export function getPlaylistItemsId(
       });
       return { playListVideos: videoIds, playlistTitle: playlist.data };
     }),
+    catchError((err) => {
+      throw new HttpError(err);
+    }),
   );
 }
 
@@ -72,6 +97,6 @@ function getPlaylistId(url: string): string {
   if (match && match[2]) {
     return match[2];
   } else {
-    throw new Error('Invalid YouTube playlist URL');
+    throw new HttpError('Invalid YouTube playlist URL');
   }
 }
