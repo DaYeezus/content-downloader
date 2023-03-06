@@ -3,13 +3,11 @@ import Ffmpeg, { FfmpegCommand } from 'fluent-ffmpeg';
 import { catchError, from, map, mergeMap, Observable, of } from 'rxjs';
 import ytdl, { videoInfo } from 'ytdl-core';
 import { HttpError } from 'http-errors';
-import { getCachedData } from './redis.service';
+import { getCachedVideo } from './redis.service';
 import path from 'path';
-export interface FetchedVideoInfo {
-  title: string;
-  image: ytdl.thumbnail;
-  url: string;
-}
+import { youtubePlayList } from '../interfaces/youtube-playlist.interface';
+import internal from 'stream';
+import { convertVideoToFlac, convertVideoToMp3 } from './convertor.service';
 export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
   return from(ytdl.getInfo(link)).pipe(
     map((data: videoInfo) => {
@@ -22,7 +20,7 @@ export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
 }
 
 export function downloadSingleAudio(link: string, isHightQUality = true) {
-  return getCachedData(link).pipe(
+  return getCachedVideo(link).pipe(
     mergeMap((info: videoInfo) => {
       const stream = ytdl.downloadFromInfo(info, {
         filter: 'audioonly',
@@ -36,17 +34,18 @@ export function downloadSingleAudio(link: string, isHightQUality = true) {
         `${Math.floor(Math.random() * 1000000)}.mp3`,
       );
 
-      return of(
-        Ffmpeg(stream)
-          .audioBitrate(isHightQUality ? 320 : 128)
-          .toFormat(isHightQUality ? 'flac' : 'mp3')
-          .outputOptions(
-            '-metadata',
-            `artist=${info.videoDetails.ownerChannelName}`,
-            '-codec:a libmp3lame',
-            '-b:a 320k', 
-          )
-          .save(filePath),
+      return (
+        isHightQUality
+          ? convertVideoToFlac(
+              stream,
+              filePath,
+              info.videoDetails.ownerChannelName,
+            )
+          : convertVideoToMp3(
+              stream,
+              filePath,
+              info.videoDetails.ownerChannelName,
+            )
       ).pipe(
         map((data: FfmpegCommand) => {
           return { data, filePath, title: info.videoDetails.title };
@@ -83,17 +82,17 @@ export function getPlaylistInfo(link: string): Observable<AxiosResponse> {
   );
 }
 
-export function getPlaylistItemsId(
-  link: string,
-): Observable<{ playListVideos: string[]; playlistTitle: string }> {
+export function getPlaylistItemsId(link: string): Observable<string[]> {
   return getPlaylistInfo(link).pipe(
     map((playlist) => {
       const videoIds: string[] = [];
 
-      playlist.data.items.forEach((item: any) => {
-        videoIds.push(item.snippet.resourceId.videoId);
-      });
-      return { playListVideos: videoIds, playlistTitle: playlist.data };
+      (playlist.data.items as youtubePlayList.Item[]).forEach(
+        (item: youtubePlayList.Item) => {
+          videoIds.push(item.snippet.resourceId.videoId);
+        },
+      );
+      return videoIds;
     }),
     catchError((err) => {
       throw new HttpError(err);

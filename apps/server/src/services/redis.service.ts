@@ -1,9 +1,9 @@
 import { from, map, mergeMap, Observable } from 'rxjs';
 import { videoInfo } from 'ytdl-core';
 import { redisClient } from '../conf/redis.conf';
-import { FetchedVideoInfo, getYoutubeContentInfo } from './youtube.service';
+import { getYoutubeContentInfo } from './youtube.service';
 
-export function getCachedData(link: string): Observable<videoInfo> {
+export function getCachedVideo(link: string): Observable<videoInfo> {
   return new Observable((observer) => {
     from(redisClient.get(link))
       .pipe(

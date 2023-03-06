@@ -9,9 +9,10 @@ import * as path from 'path';
 import {
   downloadSingleAudio,
   getPlaylistInfo,
+  getPlaylistItemsId,
   getYoutubeContentInfo,
 } from '../services/youtube.service';
-import { getCachedData } from '../services/redis.service';
+import { getCachedVideo } from '../services/redis.service';
 import { videoInfo } from 'ytdl-core';
 
 export async function getContentInfo(
@@ -21,7 +22,7 @@ export async function getContentInfo(
 ) {
   try {
     const { link } = await getYoutubeInfoSchema.parseAsync(req.body);
-    getCachedData(link).subscribe({
+    getCachedVideo(link).subscribe({
       next(info: videoInfo) {
         return res.status(200).json({
           video: {
@@ -79,12 +80,11 @@ export async function downloadFromPlaylist(
   next: NextFunction,
 ) {
   try {
-    const { link } = await downloadContentFromPlaylistSchema.parseAsync(
-      req.body,
-    );
-    getPlaylistInfo(link).subscribe({
+    const { link, format, isHighQuality } =
+      await downloadContentFromPlaylistSchema.parseAsync(req.body);
+    getPlaylistItemsId(link).subscribe({
       next(value) {
-        return res.send(value.data);
+        return res.send(value);
       },
       error: (err) => next(err),
     });
