@@ -4,6 +4,7 @@ import { catchError, from, map, mergeMap, Observable, of } from 'rxjs';
 import ytdl, { videoInfo } from 'ytdl-core';
 import { HttpError } from 'http-errors';
 import { getCachedData } from './redis.service';
+import path from 'path';
 export interface FetchedVideoInfo {
   title: string;
   image: ytdl.thumbnail;
@@ -20,28 +21,38 @@ export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
   );
 }
 
-export function downloadSingleAudio(
-  link: string,
-  isHightQUality = true,
-  filePath: string,
-) {
+export function downloadSingleAudio(link: string, isHightQUality = true) {
   return getCachedData(link).pipe(
     mergeMap((info: videoInfo) => {
       const stream = ytdl.downloadFromInfo(info, {
         filter: 'audioonly',
         quality: isHightQUality ? 'highestaudio' : 'lowestaudio',
       });
+      const filePath = path.join(
+        __dirname,
+        '..',
+        '..',
+        'public',
+        `${Math.floor(Math.random() * 1000000)}.mp3`,
+      );
 
       return of(
         Ffmpeg(stream)
           .audioBitrate(isHightQUality ? 320 : 128)
           .toFormat(isHightQUality ? 'flac' : 'mp3')
+          .outputOptions(
+            '-metadata',
+            `artist=${info.videoDetails.ownerChannelName}`,
+            '-codec:a libmp3lame',
+            '-b:a 320k', 
+          )
           .save(filePath),
       ).pipe(
         map((data: FfmpegCommand) => {
-          return data;
+          return { data, filePath, title: info.videoDetails.title };
         }),
         catchError((err) => {
+          console.log(err);
           throw new HttpError(err);
         }),
       );

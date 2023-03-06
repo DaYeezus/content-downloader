@@ -51,23 +51,13 @@ export async function downloadFromVideo(
       await downloadContentFromVideoSchema.parseAsync(req.body);
 
     const quality = isHighQuality === 'true';
-    const filePath = path.join(
-      __dirname,
-      '..',
-      '..',
-      'public',
-      `${Math.floor(Math.random() * 1000000)}.mp3`,
-    );
-    // TODO : add download form info and get info from cached url that use redis
-    downloadSingleAudio(link, quality, filePath).subscribe({
-      next(data) {
+    downloadSingleAudio(link, quality).subscribe({
+      next({ data, filePath, title }) {
         data.on('end', () => {
-          res.download(filePath, (err) => {
+          res.download(filePath, `${title}`, (err) => {
             if (err) {
               console.error(err);
             }
-
-            // Delete the temporary file from the server.
             fs.unlink(filePath, (err) => {
               if (err) {
                 console.error(err);
