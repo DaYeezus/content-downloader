@@ -1,22 +1,18 @@
 import axios, { AxiosResponse } from 'axios';
 import Ffmpeg, { FfmpegCommand } from 'fluent-ffmpeg';
-import { catchError, from, map, Observable, of } from 'rxjs';
+import { catchError, from, map, mergeMap, Observable, of } from 'rxjs';
 import ytdl, { videoInfo } from 'ytdl-core';
 import { HttpError } from 'http-errors';
-
-export function getYoutubeContentInfo(
-  link: string,
-): Observable<{ title: string; image: ytdl.thumbnail; url: string }> {
+import { getCachedData } from './redis.service';
+export interface FetchedVideoInfo {
+  title: string;
+  image: ytdl.thumbnail;
+  url: string;
+}
+export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
   return from(ytdl.getInfo(link)).pipe(
     map((data: videoInfo) => {
-      const videoDetails = {
-        title: data.videoDetails.title,
-
-        image:
-          data.videoDetails.thumbnails[data.videoDetails.thumbnails.length - 1],
-        url: data.videoDetails.video_url,
-      };
-      return videoDetails;
+      return data;
     }),
     catchError((err) => {
       throw new HttpError(err);
@@ -28,23 +24,27 @@ export function downloadSingleAudio(
   link: string,
   isHightQUality = true,
   filePath: string,
-): Observable<any> {
-  const stream = ytdl(link, {
-    filter: 'audioonly',
-    quality: isHightQUality ? 'highestaudio' : 'lowestaudio',
-  });
+) {
+  return getCachedData(link).pipe(
+    mergeMap((info: videoInfo) => {
+      const stream = ytdl.downloadFromInfo(info, {
+        filter: 'audioonly',
+        quality: isHightQUality ? 'highestaudio' : 'lowestaudio',
+      });
 
-  return of(
-    Ffmpeg(stream)
-      .audioBitrate(isHightQUality ? 320 : 128)
-      .toFormat(isHightQUality ? 'flac' : 'mp3')
-      .save(filePath),
-  ).pipe(
-    map((data: FfmpegCommand) => {
-      return data;
-    }),
-    catchError((err) => {
-      throw new HttpError(err);
+      return of(
+        Ffmpeg(stream)
+          .audioBitrate(isHightQUality ? 320 : 128)
+          .toFormat(isHightQUality ? 'flac' : 'mp3')
+          .save(filePath),
+      ).pipe(
+        map((data: FfmpegCommand) => {
+          return data;
+        }),
+        catchError((err) => {
+          throw new HttpError(err);
+        }),
+      );
     }),
   );
 }

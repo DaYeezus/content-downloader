@@ -12,6 +12,7 @@ import { swaggerSpecs } from './conf/swagger.conf';
 import compression from 'compression';
 import helmet from 'helmet';
 import cors from 'cors';
+import { redisClient } from './conf/redis.conf';
 
 dotenv.config();
 const app: Express = express();
@@ -36,6 +37,20 @@ app.use('/api', router);
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 app.use(notFoundHandler);
 app.use(serverErrorHandler);
-app.listen(process.env.APPLICATION_PORT, () => {
+const server = app.listen(process.env.APPLICATION_PORT, () => {
   console.log(`Listening on ${process.env.APPLICATION_PORT}`);
+});
+redisClient
+  .connect()
+  .then(() => {})
+  .catch((err) => {
+    console.log(err);
+  });
+process.on('SIGINT', () => {
+  console.info('SIGINT signal received.');
+  console.log('Closing http server.');
+  server.close(() => {
+    console.log('Http server closed.');
+    process.exit(0);
+  });
 });

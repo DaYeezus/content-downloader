@@ -11,6 +11,8 @@ import {
   getPlaylistInfo,
   getYoutubeContentInfo,
 } from '../services/youtube.service';
+import { getCachedData } from '../services/redis.service';
+import { videoInfo } from 'ytdl-core';
 
 export async function getContentInfo(
   req: Request,
@@ -19,10 +21,17 @@ export async function getContentInfo(
 ) {
   try {
     const { link } = await getYoutubeInfoSchema.parseAsync(req.body);
-    getYoutubeContentInfo(link).subscribe({
-      next(value) {
+    getCachedData(link).subscribe({
+      next(info: videoInfo) {
         return res.status(200).json({
-          video: value,
+          video: {
+            title: info.videoDetails.title,
+            thumbnail:
+              info.videoDetails.thumbnails[
+                info.videoDetails.thumbnails.length - 1
+              ],
+            url: info.videoDetails.video_url,
+          },
         });
       },
       error: (err) => next(err),
