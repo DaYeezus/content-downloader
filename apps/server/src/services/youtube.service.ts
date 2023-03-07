@@ -1,14 +1,14 @@
 import axios, { AxiosResponse } from 'axios';
-import Ffmpeg, { FfmpegCommand } from 'fluent-ffmpeg';
-import { catchError, from, map, mergeMap, Observable, of } from 'rxjs';
-import ytdl, { videoInfo } from 'ytdl-core';
+import { FfmpegCommand } from 'fluent-ffmpeg';
 import { HttpError } from 'http-errors';
-import { getCachedVideo } from './redis.service';
 import path from 'path';
+import { catchError, from, map, mergeMap, Observable } from 'rxjs';
+import ytdl, { videoInfo } from 'ytdl-core';
 import { youtubePlayList } from '../interfaces/youtube-playlist.interface';
-import internal from 'stream';
 import { convertVideoToFlac, convertVideoToMp3 } from './convertor.service';
+import { getCachedVideo } from './redis.service';
 export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
+  process.env.YTDL_NO_UPDATE = 'true';
   return from(ytdl.getInfo(link)).pipe(
     map((data: videoInfo) => {
       return data;

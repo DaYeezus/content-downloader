@@ -1,6 +1,6 @@
-import Ffmpeg from "fluent-ffmpeg";
-import { of } from "rxjs";
-import internal from "stream";
+import Ffmpeg from 'fluent-ffmpeg';
+import { of } from 'rxjs';
+import internal from 'stream';
 
 export function convertVideoToFlac(
   stream: internal.Readable,
