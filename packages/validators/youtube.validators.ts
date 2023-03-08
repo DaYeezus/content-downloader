@@ -25,5 +25,5 @@ export const downloadContentFromPlaylistSchema = z.object({
     })
     .regex(youtubePlaylistRegex),
   isHighQuality: z.string().default('true'),
-  format: z.enum(['mp3', 'zip']),
+  albumName: z.string().max(12),
 });

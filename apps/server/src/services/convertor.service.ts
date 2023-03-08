@@ -1,6 +1,9 @@
+import { Archiver } from 'archiver';
 import Ffmpeg from 'fluent-ffmpeg';
+import { createReadStream, unlinkSync } from 'fs';
 import { of } from 'rxjs';
 import internal from 'stream';
+import { DownloadedAudio } from '../interfaces/download.interface';
 
 export function convertVideoToFlac(
   stream: internal.Readable,
@@ -35,4 +38,13 @@ export function convertVideoToMp3(
       .audioBitrate(128)
       .save(filePath),
   );
+}
+
+export function addFileToZip(archive: Archiver, audio: DownloadedAudio) {
+  console.log(audio);
+
+  const source = createReadStream(audio.filePath);
+  const target = audio.filePath;
+  archive.append(source, { name: target });
+  unlinkSync(audio.filePath);
 }

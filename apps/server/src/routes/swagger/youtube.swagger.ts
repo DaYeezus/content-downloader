@@ -29,7 +29,7 @@
  *              required:
  *                  - link
  *                  - isHighQuality
- *                  - format
+ *                  - albumName
  *              properties:
  *                  link:
  *                      type: string
@@ -37,9 +37,9 @@
  *                  isHighQuality:
  *                      type: boolean
  *                      description: download high quality or low quality
- *                  format:
+ *                  albumName:
  *                      type: string
- *                      enum: [zip , mp3]
+ *                      description: album name
  */
 
 /**

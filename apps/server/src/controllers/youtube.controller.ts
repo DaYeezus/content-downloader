@@ -1,19 +1,16 @@
 import { NextFunction, Request, Response } from 'express';
+import * as fs from 'fs';
 import {
   downloadContentFromPlaylistSchema,
   downloadContentFromVideoSchema,
   getYoutubeInfoSchema,
 } from 'validators';
-import * as fs from 'fs';
-import * as path from 'path';
-import {
-  downloadSingleAudio,
-  getPlaylistInfo,
-  getPlaylistItemsId,
-  getYoutubeContentInfo,
-} from '../services/youtube.service';
-import { getCachedVideo } from '../services/redis.service';
 import { videoInfo } from 'ytdl-core';
+import { getCachedVideo } from '../services/redis.service';
+import {
+  downloadAudioFromPlaylist,
+  downloadSingleAudio,
+} from '../services/youtube.service';
 
 export async function getContentInfo(
   req: Request,
@@ -55,7 +52,7 @@ export async function downloadFromVideo(
     downloadSingleAudio(link, quality).subscribe({
       next({ data, filePath, title }) {
         data.on('end', () => {
-          res.download(filePath, `${title}`, (err) => {
+          res.status(200).download(filePath, title, (err) => {
             if (err) {
               console.error(err);
             }
@@ -80,13 +77,27 @@ export async function downloadFromPlaylist(
   next: NextFunction,
 ) {
   try {
-    const { link, format, isHighQuality } =
+    const { link, isHighQuality, albumName } =
       await downloadContentFromPlaylistSchema.parseAsync(req.body);
-    getPlaylistItemsId(link).subscribe({
+    const quality = isHighQuality === 'true';
+    downloadAudioFromPlaylist(link, quality, albumName).subscribe({
       next(value) {
-        return res.send(value);
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename=${albumName}.zip`,
+        );
+        res.setHeader('Content-Type', 'application/zip');
+        res.status(200).download(value, albumName, (err) => {
+          if (err) {
+            console.error(err);
+          }
+          fs.unlink(value, (err) => {
+            if (err) {
+              console.error(err);
+            }
+          });
+        });
       },
-      error: (err) => next(err),
     });
   } catch (err: any) {
     next(err);
