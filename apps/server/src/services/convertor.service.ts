@@ -8,42 +8,70 @@ import {
 } from 'fs';
 import createHttpError from 'http-errors';
 import { join } from 'path';
-import { catchError, Observable, of, switchMap } from 'rxjs';
+import { catchError, Observable, of, switchMap, throwError } from 'rxjs';
 import internal from 'stream';
 import { DownloadedAudio } from '../interfaces/download.interface';
 
-export function convertVideoToFlac(
+export function convertVideoToFlac$(
   stream: internal.Readable,
   filePath: string,
   artistName: string,
-) {
-  return of(
-    Ffmpeg(stream)
-      .toFormat('flac')
-      .outputOptions('-metadata', `artist=${artistName}`)
-      .audioCodec('flac')
-      .audioFrequency(44100)
-      .audioChannels(2)
-      .audioBitrate(320)
-      .audioFilters('aformat=s32')
-      .save(filePath),
+): Observable<any> {
+  return of(stream).pipe(
+    catchError((error) => {
+      console.error(error);
+      throw createHttpError('Unable to create media stream');
+    }),
+    switchMap((_) =>
+      of(
+        Ffmpeg(stream)
+          .toFormat('flac')
+          .outputOptions('-metadata', `artist=${artistName}`)
+          .audioCodec('flac')
+          .audioFrequency(44100)
+          .audioChannels(2)
+          .audioBitrate(320)
+          .audioFilters('aformat=s32')
+          .save(filePath),
+      ).pipe(
+        catchError((error) => {
+          console.error(error);
+          throw createHttpError('Unable to convert video to flac');
+        }),
+      ),
+    ),
   );
 }
 
-export function convertVideoToMp3(
+export function convertVideoToMp3$(
   stream: internal.Readable,
   filePath: string,
   artistName: string,
 ) {
-  return of(
-    Ffmpeg(stream)
-      .toFormat('mp3')
-      .outputOptions('-metadata', `artist=${artistName}`)
-      .audioCodec('libmp3lame')
-      .audioFrequency(44100)
-      .audioChannels(2)
-      .audioBitrate(128)
-      .save(filePath),
+  return of(stream).pipe(
+    catchError((error) => {
+      console.error(error);
+      throw createHttpError('Unable to create media stream');
+    }),
+    switchMap((_) =>
+      of(
+        of(
+          Ffmpeg(stream)
+            .toFormat('mp3')
+            .outputOptions('-metadata', `artist=${artistName}`)
+            .audioCodec('libmp3lame')
+            .audioFrequency(44100)
+            .audioChannels(2)
+            .audioBitrate(128)
+            .save(filePath),
+        ),
+      ).pipe(
+        catchError((error) => {
+          console.error(error);
+          throw createHttpError('Unable to convert video to flac');
+        }),
+      ),
+    ),
   );
 }
 
@@ -60,34 +88,38 @@ export function zipDownloadedAudios(
   return switchMap((downloadedAudios: DownloadedAudio[]) => {
     return new Observable<string>((subscriber) => {
       // Creates a zip archive for the downloaded audio files
-      const zipFilePath = join(
-        __dirname,
-        '..',
-        '..',
-        'public',
-        `${album_name}.zip`,
-      );
-      const output = createWriteStream(zipFilePath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
-      archive.pipe(output);
-      appendDownloadedSongsTOZip(
-        downloadedAudios,
-        archive,
-        isHighQuality,
-        output,
-      );
-      output.on('close', () => {
-        subscriber.next(zipFilePath);
-        subscriber.complete();
-      });
+      try {
+        const zipFilePath = join(
+          __dirname,
+          '..',
+          '..',
+          'public',
+          `${album_name}.zip`,
+        );
+        const output = createWriteStream(zipFilePath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        archive.pipe(output);
+        appendDownloadedSongsTOZip(
+          downloadedAudios,
+          archive,
+          isHighQuality,
+          output,
+        );
+        output.on('close', () => {
+          subscriber.next(zipFilePath);
+          subscriber.complete();
+        });
 
-      archive.on('warning', (err) => {
-        subscriber.error(err);
-      });
+        archive.on('warning', (err) => {
+          subscriber.error(err);
+        });
 
-      archive.on('error', (err) => {
+        archive.on('error', (err) => {
+          subscriber.error(err);
+        });
+      } catch (err) {
         subscriber.error(err);
-      });
+      }
     });
   });
 }
@@ -161,8 +193,8 @@ export function convertStreamToSong(
 ): Observable<DownloadedAudio> {
   // Determines the conversion of the given stream to FLAC or MP3
   const command$ = isHighQuality
-    ? convertVideoToFlac(stream, filePath, channelName)
-    : convertVideoToMp3(stream, filePath, channelName);
+    ? convertVideoToFlac$(stream, filePath, channelName)
+    : convertVideoToMp3$(stream, filePath, channelName);
 
   // Return converted stream data along with file path and title
   return command$.pipe(

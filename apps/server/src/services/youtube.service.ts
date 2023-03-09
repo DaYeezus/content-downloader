@@ -63,6 +63,9 @@ export const downloadSingleAudio = (
         title,
       );
     }),
+    catchError((err) => {
+      throw createHttpError(err);
+    }),
   );
 };
 
@@ -88,7 +91,13 @@ export function downloadAudioFromPlaylist(
         toArray(),
       ),
     ),
+    catchError((err) => {
+      throw createHttpError(err);
+    }),
     zipDownloadedAudios(isHighQuality, album_name),
+    catchError((err) => {
+      throw createHttpError(err);
+    }),
   );
 }
 
@@ -142,10 +151,11 @@ export function getPlaylistItemsUrls(link: string): Observable<string[]> {
 }
 
 function getPlaylistId(url: string): string {
-  const playlistId = url.match(/^[^#\&\?]*list=([^#\&\?]+)/);
+  const regex = /^.*(youtu.be\/|list=)([^#\&\?]*).*/;
+  const match = url.match(regex);
 
-  if (playlistId) {
-    return playlistId[1];
+  if (match && match[2]) {
+    return match[2];
   } else {
     throw createHttpError('Invalid YouTube playlist URL');
   }

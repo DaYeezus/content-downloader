@@ -1,4 +1,5 @@
-import { from, Observable, of, switchMap, tap } from 'rxjs';
+import createHttpError from 'http-errors';
+import { catchError, from, Observable, of, switchMap, tap } from 'rxjs';
 import { videoInfo } from 'ytdl-core';
 import { redisClient } from '../conf/redis.conf';
 import { getPlaylistItemsUrls, getYoutubeContentInfo } from './youtube.service';
@@ -16,12 +17,20 @@ export function getCachedVideo(link: string): Observable<videoInfo> {
           tap((data) =>
             redisClient.set(link, JSON.stringify(data), { EX: 3600 }),
           ), // cache for 60 minutes
+          catchError((error) => {
+            console.error(error);
+            throw createHttpError(error);
+          }),
         );
 
         return videoInfo$;
       }
 
       return of(JSON.parse(String(result)));
+    }),
+    catchError((error) => {
+      console.error(error);
+      throw createHttpError(error);
     }),
   );
 }
@@ -36,12 +45,20 @@ export function getCachedPlaylistVideos(link: string): Observable<string[]> {
           tap(
             (data) => redisClient.set(link, JSON.stringify(data), { EX: 3600 }), // cache for 60 minutes
           ),
+          catchError((error) => {
+            console.error(error);
+            throw createHttpError(error);
+          }),
         );
 
         return playlistItemsUrls$;
       }
 
       return of(JSON.parse(String(result)));
+    }),
+    catchError((error) => {
+      console.error(error);
+      throw createHttpError(error);
     }),
   );
 }
