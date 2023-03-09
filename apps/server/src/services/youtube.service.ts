@@ -1,220 +1,152 @@
-import archiver from 'archiver';
 import axios, { AxiosResponse } from 'axios';
-import { FfmpegCommand } from 'fluent-ffmpeg';
-import {
-  appendFile,
-  createReadStream,
-  createWriteStream,
-  unlinkSync,
-} from 'fs';
-import { HttpError } from 'http-errors';
-import path, { join } from 'path';
+import createHttpError from 'http-errors';
 import {
   catchError,
-  combineLatest,
   concatMap,
+  defer,
+  forkJoin,
   from,
   map,
-  mergeMap,
   Observable,
   switchMap,
-  tap,
   toArray,
 } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 import ytdl, { videoInfo } from 'ytdl-core';
 import { DownloadedAudio } from '../interfaces/download.interface';
 import { youtubePlayList } from '../interfaces/youtube-playlist.interface';
-import { convertVideoToFlac, convertVideoToMp3 } from './convertor.service';
+import { convertStreamToSong, zipDownloadedAudios } from './convertor.service';
 import { getCachedPlaylistVideos, getCachedVideo } from './redis.service';
+
 export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
   process.env.YTDL_NO_UPDATE = 'true';
-  return from(ytdl.getInfo(link)).pipe(
-    map((data: videoInfo) => {
-      return data;
-    }),
+
+  return defer(() => ytdl.getInfo(link)).pipe(
     catchError((err) => {
-      throw new HttpError(err);
+      throw createHttpError(err);
     }),
   );
 }
 
-export function downloadSingleAudio(
+// This function downloads a single audio from a given link
+export const downloadSingleAudio = (
   link: string,
   isHighQuality: boolean,
-): Observable<DownloadedAudio> {
-  console.log(isHighQuality);
+): Observable<DownloadedAudio> => {
+  // Select video quality based on isHighQuality value
+  const quality = isHighQuality ? 'highestaudio' : 'lowestaudio';
+
   return getCachedVideo(link).pipe(
-    mergeMap((info: videoInfo) => {
+    // Switch to inner observable to handle downloading and converting
+    switchMap((info) => {
+      // Download the audio stream using ytdl library
       const stream = ytdl.downloadFromInfo(info, {
         filter: 'audioonly',
-        quality: isHighQuality ? 'highestaudio' : 'lowestaudio',
+        quality,
       });
 
-      const filePath = path.join(
-        __dirname,
-        '..',
-        '..',
-        'public',
-        `${uuidv4()}.${isHighQuality ? 'flac' : 'mp3'}`,
-      );
+      // Generate unique file path based on selected format
+      const filePath = `${__dirname}/../../public/${uuidv4()}.${
+        isHighQuality ? 'flac' : 'mp3'
+      }`;
 
-      return (
-        isHighQuality
-          ? convertVideoToFlac(
-              stream,
-              filePath,
-              info.videoDetails.ownerChannelName,
-            )
-          : convertVideoToMp3(
-              stream,
-              filePath,
-              info.videoDetails.ownerChannelName,
-            )
-      ).pipe(
-        map((data: FfmpegCommand) => {
-          return { data, filePath, title: info.videoDetails.title };
-        }),
-        catchError((err) => {
-          console.log(err);
-          throw new HttpError(err);
-        }),
+      // Save video title and channel name for later use
+      const title = info.videoDetails.title;
+      const channelName = info.videoDetails.ownerChannelName;
+
+      // Convert downloaded video stream to either FLAC or MP3 format
+      return convertStreamToSong(
+        isHighQuality,
+        stream,
+        filePath,
+        channelName,
+        title,
       );
     }),
   );
-}
+};
 
+/**
+ * Downloads audio files from a playlist and archives them into a zip file.
+ *
+ * @param {string} link - URL of the YouTube playlist.
+ * @param {boolean} isHighQuality - Whether to download high quality audio or not.
+ * @param {string} album_name - Name of the directory to be created and archived.
+ * @returns {Observable<string>} - Observable that emits the path of the zip file when complete.
+ */
 export function downloadAudioFromPlaylist(
   link: string,
   isHighQuality: boolean,
   album_name: string,
 ): Observable<string> {
   return getCachedPlaylistVideos(link).pipe(
+    // Obtains an array of video URLs from the playlist cache
     switchMap((links) =>
       from(links).pipe(
+        // Downloads each audio file sequentially
         concatMap((link) => downloadSingleAudio(link, isHighQuality)),
         toArray(),
       ),
     ),
-    switchMap((downloadedAudios: DownloadedAudio[]) => {
-      return new Observable<string>((subscriber) => {
-        const zipFilePath = join(
-          __dirname,
-          '..',
-          '..',
-          'public',
-          `${album_name}.zip`,
-        );
-        const output = createWriteStream(zipFilePath);
-        const archive = archiver('zip', { zlib: { level: 9 } });
-        archive.pipe(output);
-        Promise.all(
-          downloadedAudios.map((audio) => {
-            return new Promise((res, rej) => {
-              audio.data.on('end', () => {
-                archive.append(createReadStream(audio.filePath), {
-                  name: `${audio.title}.${isHighQuality ? 'flac' : 'mp3'}`,
-                });
-                res(null);
-              });
-            });
-          }),
-        ).then(async () => {
-          downloadedAudios.map((audio) => unlinkSync(audio.filePath));
-          await archive.finalize();
-          output.close();
-        });
-
-        output.on('close', () => {
-          console.log('output closes');
-
-          subscriber.next(zipFilePath);
-          subscriber.complete();
-        });
-
-        archive.on('warning', (err) => {
-          subscriber.error(err);
-        });
-
-        archive.on('error', (err) => {
-          subscriber.error(err);
-        });
-      });
-    }),
+    zipDownloadedAudios(isHighQuality, album_name),
   );
 }
 
+//A function to get YouTube playlist information
+//Returns an observable that emits the response of a GET request to the YouTube API
 export function getPlaylistInfo(link: string): Observable<AxiosResponse> {
+  //Extract the playlist id from the link
   const playlistId = getPlaylistId(link);
-  const apiKey = process.env.YT_API_KEY;
-  return from(
-    axios.get(
-      `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${apiKey}`,
-    ),
-  ).pipe(
-    map((response) => {
-      return response;
-    }),
-    catchError((err) => {
-      throw new HttpError(err);
-    }),
-  );
+  //Get the api key from environment variables
+  const apiKey = process.env.YT_API_KEY!;
+  //The url to make the http GET request
+  const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${apiKey}`;
+
+  return from(axios.get(url)).pipe(map((response) => response));
 }
 
+//A function to get URLs for all items in a YouTube playlist
 export function getPlaylistItemsUrls(link: string): Observable<string[]> {
-  const videoUrls: Observable<string>[] = [];
-
+  //Use the getPlaylistInfo function to get the playlist information, and switchMap allows us to chain another observable
   return getPlaylistInfo(link).pipe(
     switchMap((playlist) => {
-      from(playlist.data.items as youtubePlayList.Item[])
-        .pipe(
-          tap((item: youtubePlayList.Item) => {
-            videoUrls.push(
-              getCachedVideo(item.snippet.resourceId.videoId).pipe(
-                map((value) => value.videoDetails.video_url),
-                catchError((err) => {
-                  throw new HttpError(err);
-                }),
-              ),
-            );
+      //Extract all video ids from each item in the playlist
+      const itemIds = playlist.data.items.map(
+        (item: youtubePlayList.Item) => item.snippet.resourceId.videoId,
+      );
+      //Transforms every video id into an observable for the cached video's url
+      const videoUrlObservables = itemIds.map((itemId: string) =>
+        getCachedVideo(itemId).pipe(
+          map((value) => value.videoDetails.video_url),
+          catchError((err) => {
+            //Catch errors if any occur during transforming video ids to urls
+            throw createHttpError(err);
           }),
-        )
-        .subscribe();
-
-      return combineLatest(videoUrls).pipe(
-        map((urls) => urls.filter((url) => url !== '')),
+        ),
+      );
+      /* Uses forkJoin to subscribe to all video urls, which only emits after all passed observables complete.
+            Then it returns transformed urls and filters out any empty ones */
+      return forkJoin(videoUrlObservables).pipe(
+        map((urls: any) => urls.filter((url: string) => url !== '')),
+        catchError((err) => {
+          //Catch errors for any network failure or exceptions thrown by the underlying server-side library
+          throw createHttpError(err);
+        }),
       );
     }),
     catchError((err) => {
-      throw new HttpError(err);
+      //Catches any errors occurring while obtaining playlist information using the getPlaylistInfo function
+      throw createHttpError(err);
     }),
   );
 }
 
 function getPlaylistId(url: string): string {
-  const regex = /^.*(youtu.be\/|list=)([^#\&\?]*).*/;
-  const match = url.match(regex);
+  const playlistId = url.match(/^[^#\&\?]*list=([^#\&\?]+)/);
 
-  if (match && match[2]) {
-    return match[2];
+  if (playlistId) {
+    return playlistId[1];
   } else {
-    throw new HttpError('Invalid YouTube playlist URL');
+    throw createHttpError('Invalid YouTube playlist URL');
   }
-}
-
-function createZipFile(filePaths: string[], folderName: string) {
-  const archive = archiver('zip', { zlib: { level: 9 } });
-  const output = createWriteStream(
-    path.join(__dirname, '..', '..', 'public', `${folderName}.zip`),
-  );
-
-  archive.pipe(output);
-
-  for (const filename of filePaths) {
-    archive.file(join(__dirname, '..', '..', 'public', filename), {
-      name: filename,
-    });
-  }
-
-  archive.finalize();
 }

@@ -1,56 +1,47 @@
-import {from, map, Observable} from 'rxjs';
-import {videoInfo} from 'ytdl-core';
-import {redisClient} from '../conf/redis.conf';
-import {getPlaylistItemsUrls, getYoutubeContentInfo} from './youtube.service';
+import { from, Observable, of, switchMap, tap } from 'rxjs';
+import { videoInfo } from 'ytdl-core';
+import { redisClient } from '../conf/redis.conf';
+import { getPlaylistItemsUrls, getYoutubeContentInfo } from './youtube.service';
+
+// both of below functions look for cached data with the content link as key and return it of it was available
+// and fetch data from original functions and set into redis of there was no cached data
 
 export function getCachedVideo(link: string): Observable<videoInfo> {
-    return new Observable((observer) => {
-        from(redisClient.get(link))
-            .pipe(
-                map((result) => {
-                    if (result) {
-                        observer.next(JSON.parse(result));
-                        observer.complete();
-                    } else {
-                        getYoutubeContentInfo(link).subscribe({
-                            next(data) {
-                                redisClient.set(link, JSON.stringify(data), {EX: 3600}); // cache for 60 minute
-                                observer.next(data);
-                                observer.complete();
-                            },
-                            error(err) {
-                                observer.error(err);
-                            },
-                        });
-                    }
-                }),
-            )
-            .subscribe();
-    });
+  const cachedVideo$ = from(redisClient.get(link));
+
+  return cachedVideo$.pipe(
+    switchMap((result) => {
+      if (!result) {
+        const videoInfo$ = getYoutubeContentInfo(link).pipe(
+          tap((data) =>
+            redisClient.set(link, JSON.stringify(data), { EX: 3600 }),
+          ), // cache for 60 minutes
+        );
+
+        return videoInfo$;
+      }
+
+      return of(JSON.parse(String(result)));
+    }),
+  );
 }
 
 export function getCachedPlaylistVideos(link: string): Observable<string[]> {
-    return new Observable((observer) => {
-        from(redisClient.get(link))
-            .pipe(
-                map((result) => {
-                    if (result) {
-                        observer.next(JSON.parse(result));
-                        observer.complete();
-                    } else {
-                        getPlaylistItemsUrls(link).subscribe({
-                            next(data) {
-                                redisClient.set(link, JSON.stringify(data), {EX: 3600});
-                                observer.next(data);
-                                observer.complete();
-                            },
-                            error(err) {
-                                observer.error(err);
-                            },
-                        });
-                    }
-                }),
-            )
-            .subscribe();
-    });
+  const cachedPlaylist$ = from(redisClient.get(link));
+
+  return cachedPlaylist$.pipe(
+    switchMap((result) => {
+      if (!result) {
+        const playlistItemsUrls$ = getPlaylistItemsUrls(link).pipe(
+          tap(
+            (data) => redisClient.set(link, JSON.stringify(data), { EX: 3600 }), // cache for 60 minutes
+          ),
+        );
+
+        return playlistItemsUrls$;
+      }
+
+      return of(JSON.parse(String(result)));
+    }),
+  );
 }

@@ -99,6 +99,9 @@ export async function downloadFromPlaylist(
           });
         });
       },
+      error(err) {
+        next(err);
+      },
     });
   } catch (err: any) {
     next(err);
