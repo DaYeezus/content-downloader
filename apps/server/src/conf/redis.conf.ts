@@ -1,4 +1,5 @@
-import { createClient } from 'redis';
+import {createClient} from 'redis';
+
 export const redisClient = createClient({
-  url: process.env.REDIS_URL,
+    url: process.env.REDIS_URL,
 });

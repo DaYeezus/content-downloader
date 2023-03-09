@@ -40,11 +40,9 @@ export function convertVideoToMp3(
   );
 }
 
-export function addFileToZip(archive: Archiver, audio: DownloadedAudio) {
-  console.log(audio);
-
-  const source = createReadStream(audio.filePath);
-  const target = audio.filePath;
-  archive.append(source, { name: target });
-  unlinkSync(audio.filePath);
+async function appendAudiosToArchive(
+  archive: Archiver,
+  downloadedAudios: DownloadedAudio[],
+) {
+  
 }

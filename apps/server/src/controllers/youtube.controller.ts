@@ -79,6 +79,7 @@ export async function downloadFromPlaylist(
   try {
     const { link, isHighQuality, albumName } =
       await downloadContentFromPlaylistSchema.parseAsync(req.body);
+    
     const quality = isHighQuality === 'true';
     downloadAudioFromPlaylist(link, quality, albumName).subscribe({
       next(value) {
@@ -91,11 +92,11 @@ export async function downloadFromPlaylist(
           if (err) {
             console.error(err);
           }
-          fs.unlink(value, (err) => {
-            if (err) {
-              console.error(err);
-            }
-          });
+          // fs.unlink(value, (err) => {
+          //   if (err) {
+          //     console.error(err);
+          //   }
+          // });
         });
       },
     });

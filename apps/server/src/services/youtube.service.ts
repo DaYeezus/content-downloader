@@ -1,12 +1,18 @@
 import archiver from 'archiver';
 import axios, { AxiosResponse } from 'axios';
 import { FfmpegCommand } from 'fluent-ffmpeg';
-import { createWriteStream } from 'fs';
+import {
+  appendFile,
+  createReadStream,
+  createWriteStream,
+  unlinkSync,
+} from 'fs';
 import { HttpError } from 'http-errors';
 import path, { join } from 'path';
 import {
   catchError,
   combineLatest,
+  concatMap,
   from,
   map,
   mergeMap,
@@ -19,11 +25,7 @@ import { v4 as uuidv4 } from 'uuid';
 import ytdl, { videoInfo } from 'ytdl-core';
 import { DownloadedAudio } from '../interfaces/download.interface';
 import { youtubePlayList } from '../interfaces/youtube-playlist.interface';
-import {
-  addFileToZip,
-  convertVideoToFlac,
-  convertVideoToMp3,
-} from './convertor.service';
+import { convertVideoToFlac, convertVideoToMp3 } from './convertor.service';
 import { getCachedPlaylistVideos, getCachedVideo } from './redis.service';
 export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
   process.env.YTDL_NO_UPDATE = 'true';
@@ -39,13 +41,14 @@ export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
 
 export function downloadSingleAudio(
   link: string,
-  isHightQUality = true,
+  isHighQuality: boolean,
 ): Observable<DownloadedAudio> {
+  console.log(isHighQuality);
   return getCachedVideo(link).pipe(
     mergeMap((info: videoInfo) => {
       const stream = ytdl.downloadFromInfo(info, {
         filter: 'audioonly',
-        quality: isHightQUality ? 'highestaudio' : 'lowestaudio',
+        quality: isHighQuality ? 'highestaudio' : 'lowestaudio',
       });
 
       const filePath = path.join(
@@ -53,11 +56,11 @@ export function downloadSingleAudio(
         '..',
         '..',
         'public',
-        `${uuidv4()}.mp3`,
+        `${uuidv4()}.${isHighQuality ? 'flac' : 'mp3'}`,
       );
 
       return (
-        isHightQUality
+        isHighQuality
           ? convertVideoToFlac(
               stream,
               filePath,
@@ -85,49 +88,58 @@ export function downloadAudioFromPlaylist(
   link: string,
   isHighQuality: boolean,
   album_name: string,
-) {
+): Observable<string> {
   return getCachedPlaylistVideos(link).pipe(
     switchMap((links) =>
       from(links).pipe(
-        mergeMap((link) => downloadSingleAudio(link, isHighQuality)),
+        concatMap((link) => downloadSingleAudio(link, isHighQuality)),
         toArray(),
       ),
     ),
-    switchMap(
-      (downloadedAudios: DownloadedAudio[]) =>
-        new Observable<string>((observer) => {
-          const zipFilePath = join(
-            __dirname,
-            '..',
-            '..',
-            'public',
-            `${album_name}.zip`,
-          );
-          const output = createWriteStream(zipFilePath);
-          const archive = archiver('zip', { zlib: { level: 9 } });
-          archive.pipe(output);
+    switchMap((downloadedAudios: DownloadedAudio[]) => {
+      return new Observable<string>((subscriber) => {
+        const zipFilePath = join(
+          __dirname,
+          '..',
+          '..',
+          'public',
+          `${album_name}.zip`,
+        );
+        const output = createWriteStream(zipFilePath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        archive.pipe(output);
+        Promise.all(
+          downloadedAudios.map((audio) => {
+            return new Promise((res, rej) => {
+              audio.data.on('end', () => {
+                archive.append(createReadStream(audio.filePath), {
+                  name: `${audio.title}.${isHighQuality ? 'flac' : 'mp3'}`,
+                });
+                res(null);
+              });
+            });
+          }),
+        ).then(async () => {
+          downloadedAudios.map((audio) => unlinkSync(audio.filePath));
 
-          output.on('close', async () => {
-            console.log('done');
+          await archive.finalize();
+        });
 
-            await Promise.all(
-              downloadedAudios.map((audio) => addFileToZip(archive, audio)),
-            );
-            archive.finalize();
-            observer.next(zipFilePath);
-            observer.complete();
-            archive.finalize();
-          });
+        archive.on('finish', () => {
+          console.log('output closes');
+          subscriber.next(zipFilePath);
+          subscriber.complete();
+        });
 
-          archive.on('warning', (err) => {
-            observer.error(err);
-          });
+        archive.on('warning', (err) => {
+          subscriber.error(err);
+        });
 
-          archive.on('error', (err) => {
-            observer.error(err);
-          });
-        }),
-    ),
+        archive.on('error', (err) => {
+          subscriber.error(err);
+        });
+      });
+    }),
   );
 }
 
