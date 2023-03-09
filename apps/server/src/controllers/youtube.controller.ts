@@ -79,24 +79,24 @@ export async function downloadFromPlaylist(
   try {
     const { link, isHighQuality, albumName } =
       await downloadContentFromPlaylistSchema.parseAsync(req.body);
-    
+
     const quality = isHighQuality === 'true';
     downloadAudioFromPlaylist(link, quality, albumName).subscribe({
       next(value) {
         res.setHeader(
           'Content-Disposition',
-          `attachment; filename=${albumName}.zip`,
+          'attachment; filename=' + albumName,
         );
         res.setHeader('Content-Type', 'application/zip');
         res.status(200).download(value, albumName, (err) => {
           if (err) {
             console.error(err);
           }
-          // fs.unlink(value, (err) => {
-          //   if (err) {
-          //     console.error(err);
-          //   }
-          // });
+          fs.unlink(value, (err) => {
+            if (err) {
+              console.error(err);
+            }
+          });
         });
       },
     });

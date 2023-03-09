@@ -121,12 +121,13 @@ export function downloadAudioFromPlaylist(
           }),
         ).then(async () => {
           downloadedAudios.map((audio) => unlinkSync(audio.filePath));
-
           await archive.finalize();
+          output.close();
         });
 
-        archive.on('finish', () => {
+        output.on('close', () => {
           console.log('output closes');
+
           subscriber.next(zipFilePath);
           subscriber.complete();
         });
