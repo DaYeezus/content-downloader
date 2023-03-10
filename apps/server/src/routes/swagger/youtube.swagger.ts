@@ -1,76 +1,37 @@
 /**
  * @swagger
- *  components:
- *      schemas:
- *          getInfo:
- *              type: object
- *              required:
- *                  -   link
- *              properties:
- *                  link:
- *                      type: string
- *                      description: YouTube content link
- *          downloadVideo:
- *              type:
- *                  object
- *              required:
- *                  - link
- *                  - isHighQuality
- *              properties:
- *                  link:
- *                      type: string
- *                      description: YouTube content link
- *                  isHighQuality:
- *                      type: boolean
- *                      description: download high quality or low quality
- *          downloadPlaylist:
- *              type:
- *                  object
- *              required:
- *                  - link
- *                  - isHighQuality
- *                  - albumName
- *              properties:
- *                  link:
- *                      type: string
- *                      description: YouTube content link
- *                  isHighQuality:
- *                      type: boolean
- *                      description: download high quality or low quality
- *                  albumName:
- *                      type: string
- *                      description: album name
- */
-
-/**
- * @swagger
- *  /api/youtube/:
- *      post:
+ *  /api/youtube/video/{videoId}:
+ *      get:
  *          tags: [Youtube]
- *          summary: get information of given youtube content url
- *          requestBody:
+ *          summary: Get information of given YouTube content URL
+ *          parameters:
+ *            - in: path
+ *              name: videoId
  *              required: true
- *              content:
- *                  application/x-www-form-urlencoded:
- *                      schema:
- *                          $ref: '#/components/schemas/getInfo'
+ *              schema:
+ *                type: string
  *          responses:
  *              200:
- *                  description: success
+ *                  description: Success
  */
 
 /**
  * @swagger
- *  /api/youtube/video/:
- *      post:
+ *  /api/youtube/video/download/{videoId}:
+ *      get:
  *          tags: [Youtube]
  *          summary: download youtube video as mp3
- *          requestBody:
+ *          parameters:
+ *            - in: path
+ *              name: videoId
  *              required: true
- *              content:
- *                  application/x-www-form-urlencoded:
- *                      schema:
- *                          $ref: '#/components/schemas/downloadVideo'
+ *              schema:
+ *                type: string
+ *            - in: query
+ *              name: isHighQuality
+ *              required: true
+ *              schema:
+ *                type: boolean
  *          responses:
  *              200:
  *                  description: success
@@ -79,16 +40,46 @@
 
 /**
  * @swagger
- *  /api/youtube/playlist/:
- *      post:
+ *  /api/youtube/playlist/{playlistId}:
+ *      get:
  *          tags: [Youtube]
- *          summary: download youtube playlist as a zip or mp3
- *          requestBody:
+ *          summary: get youtube playlist info
+ *          parameters:
+ *            - in: path
+ *              name: playlistId
+ *              description: the id of youtube playlist(it comes after list=)
  *              required: true
- *              content:
- *                  application/x-www-form-urlencoded:
- *                      schema:
- *                          $ref: '#/components/schemas/downloadPlaylist'
+ *              schema:
+ *                type: string
+ *          responses:
+ *              200:
+ *                  description: success
+ *
+ */
+
+/**
+ * @swagger
+ *  /api/youtube/playlist/download/{playlistId}:
+ *      get:
+ *          tags: [Youtube]
+ *          summary: get youtube playlist info
+ *          parameters:
+ *              - in: path
+ *                name: playlistId
+ *                required: true
+ *                description: the id of youtube playlist(it comes after list=)
+ *                schema:
+ *                  type: string
+ *              - in: query
+ *                name: isHighQuality
+ *                required: true
+ *                schema:
+ *                  type: boolean
+ *              - in: query
+ *                name: albumName
+ *                required: true
+ *                schema:
+ *                  type: string
  *          responses:
  *              200:
  *                  description: success

@@ -16,27 +16,32 @@ import ytdl, { videoInfo } from 'ytdl-core';
 import { DownloadedAudio } from '../interfaces/download.interface';
 import { youtubePlayList } from '../interfaces/youtube-playlist.interface';
 import { convertStreamToSong, zipDownloadedAudios } from './convertor.service';
-import { getCachedPlaylistVideos, getCachedVideo } from './redis.service';
+import {
+  getCachedPlaylistVideos,
+  getCachedVideo,
+  getCachedYoutubePlaylistInfo,
+} from './redis.service';
+import { getPlaylistInfo } from '../controllers/youtube.controller';
 
-export function getYoutubeContentInfo(link: string): Observable<videoInfo> {
+export function getYoutubeContentInfo(videoId: string): Observable<videoInfo> {
   process.env.YTDL_NO_UPDATE = 'true';
 
-  return defer(() => ytdl.getInfo(link)).pipe(
+  return defer(() => ytdl.getInfo(videoId)).pipe(
     catchError((err) => {
       throw createHttpError(err);
     }),
   );
 }
 
-// This function downloads a single audio from a given link
+// This function downloads a single audio from a given videoId
 export const downloadSingleAudio = (
-  link: string,
+  videoId: string,
   isHighQuality: boolean,
 ): Observable<DownloadedAudio> => {
   // Select video quality based on isHighQuality value
   const quality = isHighQuality ? 'highestaudio' : 'lowestaudio';
 
-  return getCachedVideo(link).pipe(
+  return getCachedVideo(videoId).pipe(
     // Switch to inner observable to handle downloading and converting
     switchMap((info) => {
       // Download the audio stream using ytdl library
@@ -72,22 +77,22 @@ export const downloadSingleAudio = (
 /**
  * Downloads audio files from a playlist and archives them into a zip file.
  *
- * @param {string} link - URL of the YouTube playlist.
+ * @param {string} videoId - URL of the YouTube playlist.
  * @param {boolean} isHighQuality - Whether to download high quality audio or not.
  * @param {string} album_name - Name of the directory to be created and archived.
  * @returns {Observable<string>} - Observable that emits the path of the zip file when complete.
  */
 export function downloadAudioFromPlaylist(
-  link: string,
+  videoId: string,
   isHighQuality: boolean,
   album_name: string,
 ): Observable<string> {
-  return getCachedPlaylistVideos(link).pipe(
+  return getPlaylistItemsUrls(videoId).pipe(
     // Obtains an array of video URLs from the playlist cache
-    switchMap((links) =>
-      from(links).pipe(
+    switchMap((videoIds) =>
+      from(videoIds).pipe(
         // Downloads each audio file sequentially
-        concatMap((link) => downloadSingleAudio(link, isHighQuality)),
+        concatMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
         toArray(),
       ),
     ),
@@ -103,24 +108,30 @@ export function downloadAudioFromPlaylist(
 
 //A function to get YouTube playlist information
 //Returns an observable that emits the response of a GET request to the YouTube API
-export function getPlaylistInfo(link: string): Observable<AxiosResponse> {
+export function getYoutubePlaylistInfo(
+  playlistId: string,
+): Observable<AxiosResponse> {
   //Extract the playlist id from the link
-  const playlistId = getPlaylistId(link);
+
   //Get the api key from environment variables
   const apiKey = process.env.YT_API_KEY!;
   //The url to make the http GET request
   const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${apiKey}`;
 
-  return from(axios.get(url)).pipe(map((response) => response));
+  return from(axios.get(url)).pipe(
+    map((response) => {
+      return response;
+    }),
+  );
 }
 
 //A function to get URLs for all items in a YouTube playlist
-export function getPlaylistItemsUrls(link: string): Observable<string[]> {
-  //Use the getPlaylistInfo function to get the playlist information, and switchMap allows us to chain another observable
-  return getPlaylistInfo(link).pipe(
+export function getPlaylistItemsUrls(playlistId: string): Observable<string[]> {
+  //Use the getYoutubePlaylistInfo function to get the playlist information, and switchMap allows us to chain another observable
+  return getCachedYoutubePlaylistInfo(playlistId).pipe(
     switchMap((playlist) => {
       //Extract all video ids from each item in the playlist
-      const itemIds = playlist.data.items.map(
+      const itemIds = playlist.items.map(
         (item: youtubePlayList.Item) => item.snippet.resourceId.videoId,
       );
       //Transforms every video id into an observable for the cached video's url
@@ -144,19 +155,8 @@ export function getPlaylistItemsUrls(link: string): Observable<string[]> {
       );
     }),
     catchError((err) => {
-      //Catches any errors occurring while obtaining playlist information using the getPlaylistInfo function
+      //Catches any errors occurring while obtaining playlist information using the getYoutubePlaylistInfo function
       throw createHttpError(err);
     }),
   );
-}
-
-function getPlaylistId(url: string): string {
-  const regex = /^.*(youtu.be\/|list=)([^#\&\?]*).*/;
-  const match = url.match(regex);
-
-  if (match && match[2]) {
-    return match[2];
-  } else {
-    throw createHttpError('Invalid YouTube playlist URL');
-  }
 }

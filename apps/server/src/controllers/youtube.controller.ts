@@ -3,14 +3,25 @@ import * as fs from 'fs';
 import {
   downloadContentFromPlaylistSchema,
   downloadContentFromVideoSchema,
-  getYoutubeInfoSchema,
+  playlistIdSchema,
+  videoIdSchema,
 } from 'validators';
 import { videoInfo } from 'ytdl-core';
-import { getCachedVideo } from '../services/redis.service';
+import {
+  youtubePlayList,
+  youtubePlayListResponse,
+} from '../interfaces/youtube-playlist.interface';
+import {
+  getCachedVideo,
+  getCachedYoutubePlaylistInfo,
+} from '../services/redis.service';
 import {
   downloadAudioFromPlaylist,
   downloadSingleAudio,
+  getYoutubeContentInfo,
+  getYoutubePlaylistInfo,
 } from '../services/youtube.service';
+import { BadRequest } from 'http-errors';
 
 export async function getContentInfo(
   req: Request,
@@ -18,8 +29,9 @@ export async function getContentInfo(
   next: NextFunction,
 ) {
   try {
-    const { link } = await getYoutubeInfoSchema.parseAsync(req.body);
-    getCachedVideo(link).subscribe({
+    const { videoId } = await videoIdSchema.parseAsync(req.params);
+    if (!videoId) throw new BadRequest('Please insert valid youtube video');
+    getCachedVideo(videoId).subscribe({
       next(info: videoInfo) {
         return res.status(200).json({
           video: {
@@ -45,11 +57,13 @@ export async function downloadFromVideo(
   next: NextFunction,
 ) {
   try {
-    const { isHighQuality, link } =
-      await downloadContentFromVideoSchema.parseAsync(req.body);
-
+    const { isHighQuality } = await downloadContentFromVideoSchema.parseAsync(
+      req.query,
+    );
+    const { videoId } = await videoIdSchema.parseAsync(req.params);
+    if (!videoId) throw new BadRequest('Please insert valid youtube video');
     const quality = isHighQuality === 'true';
-    downloadSingleAudio(link, quality).subscribe({
+    downloadSingleAudio(videoId, quality).subscribe({
       next({ data, filePath, title }) {
         data.on('end', () => {
           res.status(200).download(filePath, title, (err) => {
@@ -71,17 +85,46 @@ export async function downloadFromVideo(
   }
 }
 
+export async function getPlaylistInfo(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { playlistId } = await playlistIdSchema.parseAsync(req.params);
+    if (!playlistId) throw new BadRequest('Please insert valid youtube video');
+
+    getCachedYoutubePlaylistInfo(playlistId).subscribe({
+      next(value) {
+        const { items, etag } = value as youtubePlayListResponse;
+        res.status(200).json({
+          items,
+          etag,
+        });
+      },
+      error(err) {
+        next(err);
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function downloadFromPlaylist(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const { link, isHighQuality, albumName } =
-      await downloadContentFromPlaylistSchema.parseAsync(req.body);
+    const { isHighQuality, albumName } =
+      await downloadContentFromPlaylistSchema.parseAsync(req.query);
+    const { playlistId } = await playlistIdSchema.parseAsync(req.params);
+
+    if (!playlistId) throw new BadRequest('Please insert valid youtube video');
 
     const quality = isHighQuality === 'true';
-    downloadAudioFromPlaylist(link, quality, albumName).subscribe({
+    downloadAudioFromPlaylist(playlistId, quality, albumName).subscribe({
       next(value) {
         res.setHeader(
           'Content-Disposition',

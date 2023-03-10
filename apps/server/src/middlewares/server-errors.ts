@@ -8,13 +8,10 @@ export function serverErrorHandler(
   res: Response,
   next: NextFunction,
 ) {
-  const statusCode: StatusCodes =
-    err?.status || err?.code || StatusCodes.INTERNAL_SERVER_ERROR;
-  const message = err?.message || 'INTERNAL SERVER ERROR';
-  return res.status(statusCode).json({
-    statusCode,
-    message,
-  });
+  const statusCode =
+    err?.status ?? err?.code ?? StatusCodes.INTERNAL_SERVER_ERROR;
+  const message = err?.message ?? 'INTERNAL SERVER ERROR';
+  return res.status(statusCode).json({ statusCode, message });
 }
 
 export function notFoundHandler(

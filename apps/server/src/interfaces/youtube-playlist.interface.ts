@@ -75,3 +75,4 @@ export declare module youtubePlayList {
     pageInfo: PageInfo;
   }
 }
+export type youtubePlayListResponse = youtubePlayList.RootObject
