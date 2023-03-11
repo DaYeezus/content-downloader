@@ -8,7 +8,6 @@ import {
   getYoutubePlaylistInfo,
 } from './youtube.service';
 import { youtubePlayListResponse } from '../interfaces/youtube-playlist.interface';
-import { getPlaylistInfo } from '../controllers/youtube.controller';
 
 // both of below functions look for cached data with the content link as key and return it of it was available
 // and fetch data from original functions and set into redis of there was no cached data

@@ -8,7 +8,7 @@ import {
 } from 'fs';
 import createHttpError from 'http-errors';
 import { join } from 'path';
-import { catchError, Observable, of, switchMap, throwError } from 'rxjs';
+import { catchError, Observable, of, switchMap } from 'rxjs';
 import internal from 'stream';
 import { DownloadedAudio } from '../interfaces/download.interface';
 
@@ -19,7 +19,6 @@ export function convertVideoToFlac$(
 ): Observable<any> {
   return of(stream).pipe(
     catchError((error) => {
-      console.error(error);
       throw createHttpError('Unable to create media stream');
     }),
     switchMap((_) =>
@@ -35,7 +34,6 @@ export function convertVideoToFlac$(
           .save(filePath),
       ).pipe(
         catchError((error) => {
-          console.error(error);
           throw createHttpError('Unable to convert video to flac');
         }),
       ),
@@ -50,7 +48,6 @@ export function convertVideoToMp3$(
 ) {
   return of(stream).pipe(
     catchError((error) => {
-      console.error(error);
       throw createHttpError('Unable to create media stream');
     }),
     switchMap((_) =>
@@ -67,7 +64,6 @@ export function convertVideoToMp3$(
         ),
       ).pipe(
         catchError((error) => {
-          console.error(error);
           throw createHttpError('Unable to convert video to flac');
         }),
       ),
@@ -163,14 +159,9 @@ export function appendDownloadedSongsTOZip(
         downloadedAudios.forEach((audio) => unlinkSync(audio.filePath));
         await archive.finalize();
         output.close();
-        console.log('Archive created successfully');
-      } catch (err) {
-        console.error('Error finalizing the archive:', err);
-      }
+      } catch (err) {}
     })
-    .catch((err) => {
-      console.error('An error occurred while creating the archive:', err);
-    });
+    .catch((err) => {});
 }
 
 /**

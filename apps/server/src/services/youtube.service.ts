@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
-import createHttpError from 'http-errors';
+import createHttpError, { BadRequest } from 'http-errors';
 import {
   catchError,
   concatMap,
@@ -14,14 +14,12 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import ytdl, { videoInfo } from 'ytdl-core';
 import { DownloadedAudio } from '../interfaces/download.interface';
-import { youtubePlayList } from '../interfaces/youtube-playlist.interface';
-import { convertStreamToSong, zipDownloadedAudios } from './convertor.service';
 import {
-  getCachedPlaylistVideos,
-  getCachedVideo,
-  getCachedYoutubePlaylistInfo,
-} from './redis.service';
-import { getPlaylistInfo } from '../controllers/youtube.controller';
+  youtubePlayList,
+  youtubePlayListResponse,
+} from '../interfaces/youtube-playlist.interface';
+import { convertStreamToSong, zipDownloadedAudios } from './convertor.service';
+import { getCachedVideo, getCachedYoutubePlaylistInfo } from './redis.service';
 
 export function getYoutubeContentInfo(videoId: string): Observable<videoInfo> {
   process.env.YTDL_NO_UPDATE = 'true';
@@ -120,6 +118,15 @@ export function getYoutubePlaylistInfo(
 
   return from(axios.get(url)).pipe(
     map((response) => {
+      if (
+        (
+          (response.data as youtubePlayListResponse)
+            .items as youtubePlayList.Item[]
+        ).length > 15
+      ) {
+        throw new BadRequest('Playlist can have 15 videos at most.');
+      }
+
       return response;
     }),
   );
@@ -145,9 +152,11 @@ export function getPlaylistItemsUrls(playlistId: string): Observable<string[]> {
         ),
       );
       /* Uses forkJoin to subscribe to all video urls, which only emits after all passed observables complete.
-            Then it returns transformed urls and filters out any empty ones */
+                  Then it returns transformed urls and filters out any empty ones */
       return forkJoin(videoUrlObservables).pipe(
-        map((urls: any) => urls.filter((url: string) => url !== '')),
+        map((urls: string[]) => {
+          return urls.filter((url: string) => url !== '');
+        }),
         catchError((err) => {
           //Catch errors for any network failure or exceptions thrown by the underlying server-side library
           throw createHttpError(err);

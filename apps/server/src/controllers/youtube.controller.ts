@@ -7,10 +7,7 @@ import {
   videoIdSchema,
 } from 'validators';
 import { videoInfo } from 'ytdl-core';
-import {
-  youtubePlayList,
-  youtubePlayListResponse,
-} from '../interfaces/youtube-playlist.interface';
+import { youtubePlayListResponse } from '../interfaces/youtube-playlist.interface';
 import {
   getCachedVideo,
   getCachedYoutubePlaylistInfo,
@@ -18,8 +15,6 @@ import {
 import {
   downloadAudioFromPlaylist,
   downloadSingleAudio,
-  getYoutubeContentInfo,
-  getYoutubePlaylistInfo,
 } from '../services/youtube.service';
 import { BadRequest } from 'http-errors';
 
