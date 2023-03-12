@@ -1,10 +1,2 @@
-apps/server/node_modules/ 
-apps/server/.env
-apps/client/node_modules
 node_modules
-apps/server/dist
-apps/client/build
-apps/client/.next
-apps/server/public
-packages/validators/dist
-
+.idea

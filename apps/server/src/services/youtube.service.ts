@@ -112,7 +112,7 @@ export function getYoutubePlaylistInfo(
   //Extract the playlist id from the link
 
   //Get the api key from environment variables
-  const apiKey = process.env.YT_API_KEY!;
+  const apiKey = process.env.YT_API_KEY;
   //The url to make the http GET request
   const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${apiKey}`;
 
