@@ -7,7 +7,7 @@ export const downloadContentFromVideoSchema = z.object({
 
 export const downloadContentFromPlaylistSchema = z.object({
   isHighQuality: z.string().default('true'),
-  albumName: z.string().max(12),
+  albumName: z.string(),
 });
 export const videoUrlSchema = z.object({
   link: z

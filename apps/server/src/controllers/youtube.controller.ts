@@ -17,7 +17,7 @@ import {
   downloadSingleAudio,
 } from '../services/youtube.service';
 import { BadRequest } from 'http-errors';
-
+import contentDisposition from 'content-disposition';
 export async function getContentInfo(
   req: Request,
   res: Response,
@@ -121,21 +121,21 @@ export async function downloadFromPlaylist(
     const quality = isHighQuality === 'true';
     downloadAudioFromPlaylist(playlistId, quality, albumName).subscribe({
       next(value) {
-        res.setHeader(
-          'Content-Disposition',
-          'attachment; filename=' + albumName,
-        );
-        res.setHeader('Content-Type', 'application/zip');
-        res.status(200).download(value, albumName, (err) => {
-          if (err) {
-            console.error(err);
-          }
-          fs.unlink(value, (err) => {
-            if (err) {
-              console.error(err);
-            }
-          });
+        res.writeHead(200, {
+          'Content-Disposition': contentDisposition(albumName), // Mask non-ANSI chars
+          'Content-Transfer-Encoding': 'binary',
+          'Content-Type': 'application/zip',
         });
+
+        fs.createReadStream(value)
+          .pipe(res)
+          .on('finish', () => {
+            fs.unlink(value, (err) => {
+              if (err) {
+                console.error(err);
+              }
+            });
+          });
       },
       error(err) {
         next(err);

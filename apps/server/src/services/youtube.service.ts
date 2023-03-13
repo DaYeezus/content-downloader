@@ -4,9 +4,11 @@ import {
   catchError,
   concatMap,
   defer,
+  flatMap,
   forkJoin,
   from,
   map,
+  mergeMap,
   Observable,
   switchMap,
   toArray,
@@ -81,26 +83,32 @@ export const downloadSingleAudio = (
  * @returns {Observable<string>} - Observable that emits the path of the zip file when complete.
  */
 export function downloadAudioFromPlaylist(
-  videoId: string,
+  playlistId: string,
   isHighQuality: boolean,
-  album_name: string,
+  albumName: string,
 ): Observable<string> {
-  return getPlaylistItemsUrls(videoId).pipe(
-    // Obtains an array of video URLs from the playlist cache
+  /**
+   * Extracted function for generic error handling.
+   */
+  const handleErrors = (step: string) => (err: any) => {
+    console.error(`Error occurred while ${step}: ${err}`);
+    throw createHttpError(err);
+  };
+
+  return getPlaylistItemsUrls(playlistId).pipe(
     switchMap((videoIds) =>
       from(videoIds).pipe(
-        // Downloads each audio file sequentially
-        concatMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
+        mergeMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
         toArray(),
+        catchError(handleErrors('downloading audios')),
       ),
     ),
-    catchError((err) => {
-      throw createHttpError(err);
-    }),
-    zipDownloadedAudios(isHighQuality, album_name),
-    catchError((err) => {
-      throw createHttpError(err);
-    }),
+    mergeMap((downloadedAudios: DownloadedAudio[]) =>
+      zipDownloadedAudios(downloadedAudios, isHighQuality, albumName).pipe(
+        catchError(handleErrors('zipping downloaded audios')),
+      ),
+    ),
+    catchError(handleErrors('getting playlist items URLs')),
   );
 }
 
@@ -118,15 +126,6 @@ export function getYoutubePlaylistInfo(
 
   return from(axios.get(url)).pipe(
     map((response) => {
-      if (
-        (
-          (response.data as youtubePlayListResponse)
-            .items as youtubePlayList.Item[]
-        ).length > 15
-      ) {
-        throw new BadRequest('Playlist can have 15 videos at most.');
-      }
-
       return response;
     }),
   );

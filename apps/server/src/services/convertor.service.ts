@@ -16,28 +16,17 @@ export function convertVideoToFlac$(
   stream: internal.Readable,
   filePath: string,
   artistName: string,
-): Observable<any> {
-  return of(stream).pipe(
-    catchError((error) => {
-      throw createHttpError('Unable to create media stream');
-    }),
-    switchMap((_) =>
-      of(
-        Ffmpeg(stream)
-          .toFormat('flac')
-          .outputOptions('-metadata', `artist=${artistName}`)
-          .audioCodec('flac')
-          .audioFrequency(44100)
-          .audioChannels(2)
-          .audioBitrate(320)
-          .audioFilters('aformat=s32')
-          .save(filePath),
-      ).pipe(
-        catchError((error) => {
-          throw createHttpError('Unable to convert video to flac');
-        }),
-      ),
-    ),
+) {
+  return of(
+    Ffmpeg(stream)
+      .toFormat('flac')
+      .outputOptions('-metadata', `artist=${artistName}`)
+      .audioCodec('flac')
+      .audioFrequency(44100)
+      .audioChannels(2)
+      .audioBitrate(320)
+      .audioFilters('aformat=s32')
+      .save(filePath),
   );
 }
 
@@ -46,28 +35,15 @@ export function convertVideoToMp3$(
   filePath: string,
   artistName: string,
 ) {
-  return of(stream).pipe(
-    catchError((error) => {
-      throw createHttpError('Unable to create media stream');
-    }),
-    switchMap((_) =>
-      of(
-        of(
-          Ffmpeg(stream)
-            .toFormat('mp3')
-            .outputOptions('-metadata', `artist=${artistName}`)
-            .audioCodec('libmp3lame')
-            .audioFrequency(44100)
-            .audioChannels(2)
-            .audioBitrate(128)
-            .save(filePath),
-        ),
-      ).pipe(
-        catchError((error) => {
-          throw createHttpError('Unable to convert video to flac');
-        }),
-      ),
-    ),
+  return of(
+    Ffmpeg(stream)
+      .toFormat('mp3')
+      .outputOptions('-metadata', `artist=${artistName}`)
+      .audioCodec('libmp3lame')
+      .audioFrequency(44100)
+      .audioChannels(2)
+      .audioBitrate(128)
+      .save(filePath),
   );
 }
 
@@ -78,45 +54,44 @@ export function convertVideoToMp3$(
  * @returns {Observable<string>} - Observable that emits the path of the zip file when complete.
  */
 export function zipDownloadedAudios(
+  downloadedAudios: DownloadedAudio[],
   isHighQuality: boolean,
   album_name: string,
-) {
-  return switchMap((downloadedAudios: DownloadedAudio[]) => {
-    return new Observable<string>((subscriber) => {
+): Observable<string> {
+  return new Observable<string>((subscriber) => {
+    try {
       // Creates a zip archive for the downloaded audio files
-      try {
-        const zipFilePath = join(
-          __dirname,
-          '..',
-          '..',
-          'public',
-          `${album_name}.zip`,
-        );
-        const output = createWriteStream(zipFilePath);
-        const archive = archiver('zip', { zlib: { level: 9 } });
-        archive.pipe(output);
-        appendDownloadedSongsTOZip(
-          downloadedAudios,
-          archive,
-          isHighQuality,
-          output,
-        );
-        output.on('close', () => {
-          subscriber.next(zipFilePath);
-          subscriber.complete();
-        });
+      const zipFilePath = join(
+        __dirname,
+        '..',
+        '..',
+        'public',
+        `${album_name}.zip`,
+      );
+      const output = createWriteStream(zipFilePath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      archive.pipe(output);
+      appendDownloadedSongsTOZip(
+        downloadedAudios,
+        archive,
+        isHighQuality,
+        output,
+      );
+      output.on('close', () => {
+        subscriber.next(zipFilePath);
+        subscriber.complete();
+      });
 
-        archive.on('warning', (err) => {
-          subscriber.error(err);
-        });
-
-        archive.on('error', (err) => {
-          subscriber.error(err);
-        });
-      } catch (err) {
+      archive.on('warning', (err) => {
         subscriber.error(err);
-      }
-    });
+      });
+
+      archive.on('error', (err) => {
+        subscriber.error(err);
+      });
+    } catch (err) {
+      subscriber.error(err);
+    }
   });
 }
 
@@ -129,39 +104,35 @@ export function zipDownloadedAudios(
  * @param {WriteStream} output - The write stream used by the zip archive.
  * @returns {Void}
  */
-export function appendDownloadedSongsTOZip(
+export async function appendDownloadedSongsTOZip(
   downloadedAudios: DownloadedAudio[],
   archive: Archiver,
   isHighQuality: boolean,
   output: WriteStream,
-): void {
-  Promise.all(
-    downloadedAudios.map((audio) => {
-      // Waits until each audio file has been downloaded before appending it to the archive
-      return new Promise<void>((resolve, reject) => {
-        audio.data.on('end', () => {
-          // Append the downloaded audio file to the archive
-          archive.append(createReadStream(audio.filePath), {
-            name: `${audio.title}.${isHighQuality ? 'flac' : 'mp3'}`,
+): Promise<void> {
+  try {
+    await Promise.all(
+      downloadedAudios.map((audio) => {
+        return new Promise((res, rej) => {
+          audio.data.on('end', () => {
+            archive.append(createReadStream(audio.filePath), {
+              name: `${audio.title}.${isHighQuality ? 'flac' : 'mp3'}`,
+            });
+            res(null);
           });
-          resolve();
+          audio.data.on('error', (error: any) => {
+            throw new Error(error);
+          });
         });
-
-        audio.data.on('error', (err) => {
-          reject(err);
-        });
-      });
-    }),
-  )
-    .then(async () => {
-      // Cleans up the downloaded audio files and finalizes the archive
-      try {
-        downloadedAudios.forEach((audio) => unlinkSync(audio.filePath));
-        await archive.finalize();
-        output.close();
-      } catch (err) {}
-    })
-    .catch((err) => {});
+      }),
+    ).then(async () => {
+      downloadedAudios.map((audio) => unlinkSync(audio.filePath));
+      await archive.finalize();
+      output.close();
+    });
+  } catch (err: any) {
+    throw createHttpError(err);
+  }
 }
 
 /**

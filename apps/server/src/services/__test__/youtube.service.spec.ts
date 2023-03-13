@@ -1,11 +1,12 @@
 import {
+  downloadAudioFromPlaylist,
   downloadSingleAudio,
   getPlaylistItemsUrls,
   getYoutubeContentInfo,
   getYoutubePlaylistInfo,
 } from '../youtube.service';
 import { videoInfo } from 'ytdl-core';
-import { concatMap, firstValueFrom, map } from 'rxjs';
+import { concatMap, first, firstValueFrom, map } from 'rxjs';
 import {
   describe,
   test,
@@ -24,9 +25,15 @@ import {
 } from '../../interfaces/youtube-playlist.interface';
 import { afterEach, beforeEach } from 'node:test';
 describe('Youtube service', function () {
-  beforeAll(() => {
-    // config dotenv
+  beforeAll(async () => {
+    await redisClient.connect();
+    await redisClient.flushAll();
     config();
+  });
+
+  afterAll(async () => {
+    await redisClient.disconnect();
+    await redisClient.flushAll();
   });
   const youtubeVideoLink = 'https://www.youtube.com/watch?v=5hPtU8Jbpg0';
   const playlistId = 'PLcdCdVUWGyjhN6Ea6RL1DX-GpeD8gXmsY';
@@ -52,13 +59,6 @@ describe('Youtube service', function () {
     });
   });
   describe('download single audio', function () {
-    beforeAll(async () => {
-      await redisClient.connect();
-    });
-    afterAll(async () => {
-      await redisClient.disconnect();
-    });
-
     test('should download file successfully(mp3)', async function () {
       const result = await firstValueFrom(
         downloadSingleAudio(youtubeVideoLink, false),
@@ -101,16 +101,6 @@ describe('Youtube service', function () {
     });
   });
   describe('getPlaylistItemsUrls', () => {
-    beforeAll(async () => {
-      await redisClient.connect();
-      await redisClient.flushAll();
-    });
-
-    afterAll(async () => {
-      await redisClient.disconnect();
-      await redisClient.flushAll();
-    });
-
     test('should getPlaylistItemsUrls', async () => {
       const result = await firstValueFrom(getPlaylistItemsUrls(playlistId));
       expect(result).not.toBe([]);
@@ -127,5 +117,15 @@ describe('Youtube service', function () {
         firstValueFrom(getPlaylistItemsUrls(longPlayListId)),
       ).rejects.toThrow();
     });
+  });
+  describe('download playlist', () => {
+    test('should downloadAudioFromPlaylist', async () => {
+      const result = await firstValueFrom(
+        downloadAudioFromPlaylist(playlistId, false, 'test-album'),
+      );
+      expect(result).toBeDefined();
+      expect(result).toBeTypeOf('string');
+      expect(result.endsWith('.zip')).toBe(true);
+    }, 20000);
   });
 });
