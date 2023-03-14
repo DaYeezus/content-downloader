@@ -20,7 +20,7 @@ import {
   youtubePlayList,
   youtubePlayListResponse,
 } from '../interfaces/youtube-playlist.interface';
-import {  zipDownloadedAudios } from './archive.service';
+import { zipDownloadedAudios } from './archive.service';
 import { convertStreamToSong } from './convertor.service';
 
 import { getCachedVideo, getCachedYoutubePlaylistInfo } from './redis.service';
@@ -53,9 +53,7 @@ export const downloadSingleAudio = (
       });
 
       // Generate unique file path based on selected format
-      const filePath = `${__dirname}/../../public/${uuidv4()}.${
-        isHighQuality ? 'flac' : 'mp3'
-      }`;
+      const filePath = `${__dirname}/../../public/${uuidv4()}.mp3`;
 
       // Save video title and channel name for later use
       const title = info.videoDetails.title;
@@ -109,11 +107,11 @@ export function downloadAudioFromPlaylist(
     catchError(handleErrors('getting playlist items URLs')),
   );
 }
-function downloadAllVideosFromPlaylist(
+export function downloadAllVideosFromPlaylist(
   videoIds: string[],
   isHighQuality: boolean,
   handleErrors: Function,
-) {
+): Observable<DownloadedAudio[]> {
   return from(videoIds).pipe(
     mergeMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
     toArray(),

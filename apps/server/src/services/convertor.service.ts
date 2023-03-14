@@ -26,7 +26,6 @@ export function convertVideoToHighQualityMp3$(
         .audioFrequency(44100)
         .audioChannels(2)
         .audioBitrate(320)
-        .audioFilters('aformat=s32')
         .save(filePath),
     );
   } catch (err: any) {
@@ -58,7 +57,7 @@ export function convertVideoToLowQualityMp3$(
 /**
  * Converts a video stream to either high quality or low quality MP3 file based on whether isHighQuality parameter is true or false.
  *
- * @param {boolean} isHighQuality - Whether to convert to high quality FLAC or not MP3.
+ * @param {boolean} isHighQuality - Whether to convert to high quality or low quality.
  * @param {internal.Readable} stream - The video stream that needs to be converted.
  * @param {string} filePath - The location at which the converted audio file needs to be saved.
  * @param {string} channelName - The name of the channel that the song belongs to.
@@ -73,7 +72,6 @@ export function convertStreamToSong(
   channelName: string,
   title: string,
 ): Observable<DownloadedAudio> {
-  // Determines the conversion of the given stream to FLAC or MP3
   const command$ = isHighQuality
     ? convertVideoToHighQualityMp3$(stream, filePath, channelName)
     : convertVideoToLowQualityMp3$(stream, filePath, channelName);

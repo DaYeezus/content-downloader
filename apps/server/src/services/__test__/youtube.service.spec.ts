@@ -1,4 +1,5 @@
 import {
+  downloadAllVideosFromPlaylist,
   downloadAudioFromPlaylist,
   downloadSingleAudio,
   getPlaylistItemsUrls,
@@ -24,6 +25,7 @@ import {
   youtubePlayListResponse,
 } from '../../interfaces/youtube-playlist.interface';
 import { afterEach, beforeEach } from 'node:test';
+import { rm, unlink, unlinkSync } from 'fs';
 describe('Youtube service', function () {
   beforeAll(async () => {
     await redisClient.connect();
@@ -119,6 +121,23 @@ describe('Youtube service', function () {
     });
   });
   describe('download playlist', () => {
+    test('should downloadAllVideosFromPlaylist', async () => {
+      const videoIds = await firstValueFrom(getPlaylistItemsUrls(playlistId));
+      const result = await firstValueFrom(
+        downloadAllVideosFromPlaylist(videoIds, false, () =>
+          console.log('error'),
+        ),
+      );
+      expect(result).toBeDefined();
+      expect(result.length).greaterThan(0);
+      assertType<DownloadedAudio[]>(result);
+      result.map((r) =>
+        unlink(r.filePath, (err) => {
+          if (err) console.log(err);
+        }),
+      );
+    }, 60000);
+
     test('should downloadAudioFromPlaylist', async () => {
       const result = await firstValueFrom(
         downloadAudioFromPlaylist(playlistId, false, 'test-album'),
@@ -126,6 +145,14 @@ describe('Youtube service', function () {
       expect(result).toBeDefined();
       expect(result).toBeTypeOf('string');
       expect(result.endsWith('.zip')).toBe(true);
-    }, 20000);
+      unlinkSync(result);
+    }, 60000);
+    test('should downloadAudioFromPlaylist fail invalid playlist id', async () => {
+      await expect(
+        firstValueFrom(
+          downloadAudioFromPlaylist('invalid id', false, 'test-album'),
+        ),
+      ).rejects.toThrow();
+    }, 60000);
   });
 });
