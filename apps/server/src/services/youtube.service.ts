@@ -20,7 +20,9 @@ import {
   youtubePlayList,
   youtubePlayListResponse,
 } from '../interfaces/youtube-playlist.interface';
-import { convertStreamToSong, zipDownloadedAudios } from './convertor.service';
+import {  zipDownloadedAudios } from './archive.service';
+import { convertStreamToSong } from './convertor.service';
+
 import { getCachedVideo, getCachedYoutubePlaylistInfo } from './redis.service';
 
 export function getYoutubeContentInfo(videoId: string): Observable<videoInfo> {
@@ -97,11 +99,7 @@ export function downloadAudioFromPlaylist(
 
   return getPlaylistItemsUrls(playlistId).pipe(
     switchMap((videoIds) =>
-      from(videoIds).pipe(
-        mergeMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
-        toArray(),
-        catchError(handleErrors('downloading audios')),
-      ),
+      downloadAllVideosFromPlaylist(videoIds, isHighQuality, handleErrors),
     ),
     mergeMap((downloadedAudios: DownloadedAudio[]) =>
       zipDownloadedAudios(downloadedAudios, isHighQuality, albumName).pipe(
@@ -109,6 +107,17 @@ export function downloadAudioFromPlaylist(
       ),
     ),
     catchError(handleErrors('getting playlist items URLs')),
+  );
+}
+function downloadAllVideosFromPlaylist(
+  videoIds: string[],
+  isHighQuality: boolean,
+  handleErrors: Function,
+) {
+  return from(videoIds).pipe(
+    mergeMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
+    toArray(),
+    catchError(handleErrors('downloading audios')),
   );
 }
 
@@ -126,6 +135,14 @@ export function getYoutubePlaylistInfo(
 
   return from(axios.get(url)).pipe(
     map((response) => {
+      if (
+        (
+          (response.data as youtubePlayListResponse)
+            .items as youtubePlayList.Item[]
+        ).length > 25
+      ) {
+        throw new BadRequest('Playlist can have 25 videos at most.');
+      }
       return response;
     }),
   );
