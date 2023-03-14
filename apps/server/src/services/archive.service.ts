@@ -78,8 +78,8 @@ export async function appendDownloadedSongsTOZip(
       downloadedAudios.map((audio) => {
         return new Promise((res, rej) => {
           audio.data.on('end', () => {
-            archive.append(createReadStream(audio.filePath), {  
-              name: `${audio.title}.mp3`,
+            archive.append(createReadStream(audio.filePath), {
+              name: `${audio.title}.${isHighQuality ? 'flac' : 'mp3'}`,
             });
             res(null);
           });

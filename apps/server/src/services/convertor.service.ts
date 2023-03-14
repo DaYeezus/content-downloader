@@ -1,18 +1,32 @@
-import archiver, { Archiver } from 'archiver';
 import Ffmpeg from 'fluent-ffmpeg';
-import {
-  createReadStream,
-  createWriteStream,
-  unlinkSync,
-  WriteStream,
-} from 'fs';
 import createHttpError from 'http-errors';
-import { join } from 'path';
 import { catchError, Observable, of, switchMap } from 'rxjs';
 import internal from 'stream';
 import { DownloadedAudio } from '../interfaces/download.interface';
 
-export function convertVideoToHighQualityMp3$(
+export function convertVideoToFlac$(
+  stream: internal.Readable,
+  filePath: string,
+  artistName: string,
+) {
+  try {
+    return of(
+      Ffmpeg(stream)
+        .toFormat('flac')
+        .outputOptions('-metadata', `artist=${artistName}`)
+        .audioCodec('flac')
+        .audioFrequency(96000)
+        .audioFilters('aformat=s32:sample_fmts=fltp:sample_rates=96000')
+        .audioChannels(2)
+        .audioBitrate(320)
+        .save(filePath),
+    );
+  } catch (err: any) {
+    throw createHttpError(err);
+  }
+}
+
+export function convertVideoToMp3$(
   stream: internal.Readable,
   filePath: string,
   artistName: string,
@@ -25,27 +39,6 @@ export function convertVideoToHighQualityMp3$(
         .audioCodec('libmp3lame')
         .audioFrequency(44100)
         .audioChannels(2)
-        .audioBitrate(320)
-        .save(filePath),
-    );
-  } catch (err: any) {
-    throw createHttpError(err);
-  }
-}
-
-export function convertVideoToLowQualityMp3$(
-  stream: internal.Readable,
-  filePath: string,
-  artistName: string,
-) {
-  try {
-    return of(
-      Ffmpeg(stream)
-        .toFormat('mp3')
-        .outputOptions('-metadata', `artist=${artistName}`)
-        .audioCodec('libmp3lame')
-        .audioFrequency(44100)
-        .audioChannels(1)
         .audioBitrate(128)
         .save(filePath),
     );
@@ -73,8 +66,8 @@ export function convertStreamToSong(
   title: string,
 ): Observable<DownloadedAudio> {
   const command$ = isHighQuality
-    ? convertVideoToHighQualityMp3$(stream, filePath, channelName)
-    : convertVideoToLowQualityMp3$(stream, filePath, channelName);
+    ? convertVideoToFlac$(stream, filePath, channelName)
+    : convertVideoToMp3$(stream, filePath, channelName);
 
   // Return converted stream data along with file path and title
   return command$.pipe(

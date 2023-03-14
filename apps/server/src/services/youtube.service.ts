@@ -2,9 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import createHttpError, { BadRequest } from 'http-errors';
 import {
   catchError,
-  concatMap,
   defer,
-  flatMap,
   forkJoin,
   from,
   map,
@@ -53,7 +51,9 @@ export const downloadSingleAudio = (
       });
 
       // Generate unique file path based on selected format
-      const filePath = `${__dirname}/../../public/${uuidv4()}.mp3`;
+      const filePath = `${__dirname}/../../public/${uuidv4()}.${
+        isHighQuality ? 'flac' : 'mp3'
+      }`;
 
       // Save video title and channel name for later use
       const title = info.videoDetails.title;
@@ -107,6 +107,7 @@ export function downloadAudioFromPlaylist(
     catchError(handleErrors('getting playlist items URLs')),
   );
 }
+
 export function downloadAllVideosFromPlaylist(
   videoIds: string[],
   isHighQuality: boolean,
@@ -166,7 +167,7 @@ export function getPlaylistItemsUrls(playlistId: string): Observable<string[]> {
         ),
       );
       /* Uses forkJoin to subscribe to all video urls, which only emits after all passed observables complete.
-                  Then it returns transformed urls and filters out any empty ones */
+                        Then it returns transformed urls and filters out any empty ones */
       return forkJoin(videoUrlObservables).pipe(
         map((urls: string[]) => {
           return urls.filter((url: string) => url !== '');

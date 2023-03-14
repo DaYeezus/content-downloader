@@ -7,25 +7,21 @@ import {
   getYoutubePlaylistInfo,
 } from '../youtube.service';
 import { videoInfo } from 'ytdl-core';
-import { concatMap, first, firstValueFrom, map } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import {
-  describe,
-  test,
-  expect,
+  afterAll,
   assertType,
   beforeAll,
-  afterAll,
+  describe,
+  expect,
+  test,
 } from 'vitest';
 import { DownloadedAudio } from '../../interfaces/download.interface';
 import { redisClient } from '../../conf/redis.conf';
-import exp from 'constants';
 import { config } from 'dotenv';
-import {
-  youtubePlayList,
-  youtubePlayListResponse,
-} from '../../interfaces/youtube-playlist.interface';
-import { afterEach, beforeEach } from 'node:test';
-import { rm, unlink, unlinkSync } from 'fs';
+import { youtubePlayListResponse } from '../../interfaces/youtube-playlist.interface';
+import { unlink, unlinkSync } from 'fs';
+
 describe('Youtube service', function () {
   beforeAll(async () => {
     await redisClient.connect();
@@ -34,8 +30,8 @@ describe('Youtube service', function () {
   });
 
   afterAll(async () => {
-    await redisClient.disconnect();
     await redisClient.flushAll();
+    await redisClient.disconnect();
   });
   const youtubeVideoLink = 'https://www.youtube.com/watch?v=5hPtU8Jbpg0';
   const playlistId = 'PLcdCdVUWGyjhN6Ea6RL1DX-GpeD8gXmsY';
