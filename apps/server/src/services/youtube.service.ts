@@ -2,6 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import createHttpError, { BadRequest } from 'http-errors';
 import {
   catchError,
+  concatMap,
   defer,
   forkJoin,
   from,
@@ -11,8 +12,9 @@ import {
   switchMap,
   toArray,
 } from 'rxjs';
+import dns from 'dns';
 import { v4 as uuidv4 } from 'uuid';
-import ytdl, { videoInfo } from 'ytdl-core';
+import ytdl, { getInfoOptions, videoInfo } from 'ytdl-core';
 import { DownloadedAudio } from '../interfaces/download.interface';
 import {
   youtubePlayList,
@@ -22,13 +24,16 @@ import { zipDownloadedAudios } from './archive.service';
 import { convertStreamToSong } from './convertor.service';
 
 import { getCachedVideo, getCachedYoutubePlaylistInfo } from './redis.service';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 export function getYoutubeContentInfo(videoId: string): Observable<videoInfo> {
   process.env.YTDL_NO_UPDATE = 'true';
 
-  return defer(() => ytdl.getInfo(videoId)).pipe(
-    catchError((err) => {
-      throw createHttpError(err);
+  return from(ytdl.getInfo(videoId)).pipe(
+    map((info: videoInfo) => {
+      console.log(info);
+
+      return info;
     }),
   );
 }
@@ -97,7 +102,11 @@ export function downloadAudioFromPlaylist(
 
   return getPlaylistItemsUrls(playlistId).pipe(
     switchMap((videoIds) =>
-      downloadAllVideosFromPlaylist(videoIds, isHighQuality, handleErrors),
+      from(videoIds).pipe(
+        mergeMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
+        toArray(),
+        catchError(handleErrors('downloading audios')),
+      ),
     ),
     mergeMap((downloadedAudios: DownloadedAudio[]) =>
       zipDownloadedAudios(downloadedAudios, isHighQuality, albumName).pipe(
@@ -105,18 +114,6 @@ export function downloadAudioFromPlaylist(
       ),
     ),
     catchError(handleErrors('getting playlist items URLs')),
-  );
-}
-
-export function downloadAllVideosFromPlaylist(
-  videoIds: string[],
-  isHighQuality: boolean,
-  handleErrors: Function,
-): Observable<DownloadedAudio[]> {
-  return from(videoIds).pipe(
-    mergeMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
-    toArray(),
-    catchError(handleErrors('downloading audios')),
   );
 }
 

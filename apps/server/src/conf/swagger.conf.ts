@@ -4,8 +4,8 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Album downloader API documentation',
-      version: '0.1.0',
+      title: 'Content downloader API documentation',
+      version: '1.0.0',
       description: 'The complete documentation for all routes',
       license: {
         name: 'MIT',

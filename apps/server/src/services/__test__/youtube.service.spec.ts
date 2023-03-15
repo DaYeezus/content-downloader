@@ -1,5 +1,4 @@
 import {
-  downloadAllVideosFromPlaylist,
   downloadAudioFromPlaylist,
   downloadSingleAudio,
   getPlaylistItemsUrls,
@@ -117,23 +116,6 @@ describe('Youtube service', function () {
     });
   });
   describe('download playlist', () => {
-    test('should downloadAllVideosFromPlaylist', async () => {
-      const videoIds = await firstValueFrom(getPlaylistItemsUrls(playlistId));
-      const result = await firstValueFrom(
-        downloadAllVideosFromPlaylist(videoIds, false, () =>
-          console.log('error'),
-        ),
-      );
-      expect(result).toBeDefined();
-      expect(result.length).greaterThan(0);
-      assertType<DownloadedAudio[]>(result);
-      result.map((r) =>
-        unlink(r.filePath, (err) => {
-          if (err) console.log(err);
-        }),
-      );
-    }, 60000);
-
     test('should downloadAudioFromPlaylist', async () => {
       const result = await firstValueFrom(
         downloadAudioFromPlaylist(playlistId, false, 'test-album'),
