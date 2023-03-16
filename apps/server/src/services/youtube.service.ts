@@ -29,20 +29,26 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 export function getYoutubeContentInfo(videoId: string): Observable<videoInfo> {
   process.env.YTDL_NO_UPDATE = 'true';
 
-  return from(ytdl.getInfo(videoId)).pipe(
-    map((info: videoInfo) => {
-      console.log(info);
-
-      return info;
+  return defer(() => ytdl.getInfo(videoId)).pipe(
+    catchError((err) => {
+      throw createHttpError(err);
     }),
   );
 }
 
+export function downloadSingleVideo(videoId: string, quality: string) {
+  getYoutubeContentInfo(videoId).subscribe({
+    next(value) {
+      console.log(value.formats);
+    },
+  });
+}
+
 // This function downloads a single audio from a given videoId
-export const downloadSingleAudio = (
+export function downloadSingleAudio(
   videoId: string,
   isHighQuality: boolean,
-): Observable<DownloadedAudio> => {
+): Observable<DownloadedAudio> {
   // Select video quality based on isHighQuality value
   const quality = isHighQuality ? 'highestaudio' : 'lowestaudio';
 
@@ -50,6 +56,7 @@ export const downloadSingleAudio = (
     // Switch to inner observable to handle downloading and converting
     switchMap((info) => {
       // Download the audio stream using ytdl library
+
       const stream = ytdl.downloadFromInfo(info, {
         filter: 'audioonly',
         quality,
@@ -77,7 +84,7 @@ export const downloadSingleAudio = (
       throw createHttpError(err);
     }),
   );
-};
+}
 
 /**
  * Downloads audio files from a playlist and archives them into a zip file.
@@ -88,6 +95,45 @@ export const downloadSingleAudio = (
  * @returns {Observable<string>} - Observable that emits the path of the zip file when complete.
  */
 export function downloadAudioFromPlaylist(
+  playlistId: string,
+  isHighQuality: boolean,
+  albumName: string,
+): Observable<string> {
+  /**
+   * Extracted function for generic error handling.
+   */
+  const handleErrors = (step: string) => (err: any) => {
+    console.error(`Error occurred while ${step}: ${err}`);
+    throw createHttpError(err);
+  };
+
+  return getPlaylistItemsUrls(playlistId).pipe(
+    switchMap((videoIds) =>
+      from(videoIds).pipe(
+        mergeMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
+        toArray(),
+        catchError(handleErrors('downloading audios')),
+      ),
+    ),
+    mergeMap((downloadedAudios: DownloadedAudio[]) =>
+      zipDownloadedAudios(downloadedAudios, isHighQuality, albumName).pipe(
+        catchError(handleErrors('zipping downloaded audios')),
+      ),
+    ),
+    catchError(handleErrors('getting playlist items URLs')),
+  );
+}
+
+
+/**
+ * Downloads video files from a playlist and archives them into a zip file.
+ *
+ * @param {string} videoId - URL of the YouTube playlist.
+ * @param {boolean} isHighQuality - Whether to download high quality audio or not.
+ * @param {string} album_name - Name of the directory to be created and archived.
+ * @returns {Observable<string>} - Observable that emits the path of the zip file when complete.
+ */
+export function downloadVideoFromPlaylist(
   playlistId: string,
   isHighQuality: boolean,
   albumName: string,
