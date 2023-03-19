@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
 import * as fs from 'fs';
 import {
+  downloadAudioSchema,
   downloadContentFromPlaylistSchema,
-  downloadContentFromVideoSchema,
+  downloadVideoSchema,
   playlistIdSchema,
   videoIdSchema,
 } from 'validators';
@@ -15,6 +16,7 @@ import {
 import {
   downloadAudioFromPlaylist,
   downloadSingleAudio,
+  downloadSingleVideo,
   downloadVideoFromPlaylist,
 } from '../services/youtube.service';
 import { BadRequest } from 'http-errors';
@@ -55,16 +57,14 @@ export async function downloadAudio(
   next: NextFunction,
 ) {
   try {
-    const { isHighQuality } = await downloadContentFromVideoSchema.parseAsync(
-      req.query,
-    );
+    const { isHighQuality } = await downloadAudioSchema.parseAsync(req.query);
     const { videoId } = await videoIdSchema.parseAsync(req.params);
     if (!videoId) throw new BadRequest('Please insert valid youtube video');
     const quality = isHighQuality === 'true';
     downloadSingleAudio(videoId, quality).subscribe({
       next({ data, filePath, title }) {
         data.on('end', () => {
-          res.status(200).download(filePath, title, (err) => {
+          res.download(filePath, title, (err) => {
             if (err) {
               console.error(err);
             }
@@ -83,31 +83,26 @@ export async function downloadAudio(
   }
 }
 
-
 export async function downloadVideo(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const { isHighQuality } = await downloadContentFromVideoSchema.parseAsync(
-      req.query,
-    );
+    const { quality } = await downloadVideoSchema.parseAsync(req.query);
     const { videoId } = await videoIdSchema.parseAsync(req.params);
-    if (!videoId) throw new BadRequest('Please insert valid youtube video');
-    const quality = isHighQuality === 'true';
-    downloadSingleAudio(videoId, quality).subscribe({
-      next({ data, filePath, title }) {
-        data.on('end', () => {
-          res.status(200).download(filePath, title, (err) => {
+    if (!videoId || !quality) throw new BadRequest('Please insert all params');
+
+    downloadSingleVideo(videoId, quality).subscribe({
+      next({ filePath, title }) {
+        res.download(filePath, title, (err) => {
+          if (err) {
+            console.error(err);
+          }
+          fs.unlink(filePath, (err) => {
             if (err) {
               console.error(err);
             }
-            fs.unlink(filePath, (err) => {
-              if (err) {
-                console.error(err);
-              }
-            });
           });
         });
       },
@@ -157,6 +152,9 @@ export async function downloadAudioPlaylist(
     if (!playlistId) throw new BadRequest('Please insert valid youtube video');
 
     const quality = isHighQuality === 'true';
+    if (!playlistId || !isHighQuality || !albumName)
+      throw new BadRequest('Please insert all params');
+
     downloadVideoFromPlaylist(playlistId, quality, albumName).subscribe({
       next(value) {
         res.writeHead(200, {
@@ -184,7 +182,6 @@ export async function downloadAudioPlaylist(
   }
 }
 
-
 export async function downloadVideoPlaylist(
   req: Request,
   res: Response,
@@ -198,6 +195,8 @@ export async function downloadVideoPlaylist(
     if (!playlistId) throw new BadRequest('Please insert valid youtube video');
 
     const quality = isHighQuality === 'true';
+    if (!playlistId || !isHighQuality || !albumName)
+      throw new BadRequest('Please insert all params');
     downloadAudioFromPlaylist(playlistId, quality, albumName).subscribe({
       next(value) {
         res.writeHead(200, {

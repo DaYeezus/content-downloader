@@ -2,6 +2,8 @@
   "name": "validators",
   "private": true,
   "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/types/index.d.ts",
   "dependencies": {
     "zod": "^3.20.6"
   },

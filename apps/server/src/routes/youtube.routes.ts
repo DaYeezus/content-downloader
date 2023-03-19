@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import {
-  downloadAudioPlaylist,
   downloadAudio,
-  getContentInfo,
-  getPlaylistInfo,
+  downloadAudioPlaylist,
   downloadVideo,
   downloadVideoPlaylist,
+  getContentInfo,
+  getPlaylistInfo,
 } from '../controllers/youtube.controller';
 
 const router: Router = Router();

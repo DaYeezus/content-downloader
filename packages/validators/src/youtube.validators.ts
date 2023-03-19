@@ -1,13 +1,17 @@
 import { z } from 'zod';
 import { youtubePlaylistRegex, youtubeVideoRegex } from './regexes';
 
-export const downloadContentFromVideoSchema = z.object({
+export const downloadAudioSchema = z.object({
   isHighQuality: z.string().default('true'),
 });
 
 export const downloadContentFromPlaylistSchema = z.object({
   isHighQuality: z.string().default('true'),
   albumName: z.string(),
+});
+
+export const downloadVideoSchema = z.object({
+  quality: z.enum(['high', 'low', 'medium']),
 });
 export const videoUrlSchema = z.object({
   link: z

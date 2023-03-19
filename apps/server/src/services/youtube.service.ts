@@ -2,8 +2,8 @@ import axios, { AxiosResponse } from 'axios';
 import createHttpError, { BadRequest } from 'http-errors';
 import {
   catchError,
-  concatMap,
   defer,
+  firstValueFrom,
   forkJoin,
   from,
   map,
@@ -12,9 +12,8 @@ import {
   switchMap,
   toArray,
 } from 'rxjs';
-import dns from 'dns';
 import { v4 as uuidv4 } from 'uuid';
-import ytdl, { getInfoOptions, videoInfo } from 'ytdl-core';
+import ytdl, { videoInfo } from 'ytdl-core';
 import { DownloadedAudio } from '../interfaces/download.interface';
 import {
   youtubePlayList,
@@ -24,7 +23,10 @@ import { zipDownloadedAudios } from './archive.service';
 import { convertStreamToSong } from './convertor.service';
 
 import { getCachedVideo, getCachedYoutubePlaylistInfo } from './redis.service';
-import { HttpsProxyAgent } from 'https-proxy-agent';
+import mergeStream from 'merge-stream';
+import { createReadStream, createWriteStream } from 'fs';
+import { FfmpegCommand } from 'fluent-ffmpeg';
+import { Readable, Stream } from 'stream';
 
 export function getYoutubeContentInfo(videoId: string): Observable<videoInfo> {
   process.env.YTDL_NO_UPDATE = 'true';
@@ -36,11 +38,82 @@ export function getYoutubeContentInfo(videoId: string): Observable<videoInfo> {
   );
 }
 
-export function downloadSingleVideo(videoId: string, quality: string) {
-  getYoutubeContentInfo(videoId).subscribe({
-    next(value) {
-      console.log(value.formats);
-    },
+export function downloadSingleVideo(
+  videoId: string,
+  quality: string,
+): Observable<{ filePath: string; title: string }> {
+  return new Observable((subscriber) => {
+    getCachedVideo(videoId).pipe(
+      mergeMap((info: videoInfo) => {
+        const videoFormats = info.formats;
+        const downloadVideoFormat =
+          quality === 'high'
+            ? videoFormats.find(
+                (fo) =>
+                  (fo.quality === 'hd1080' || fo.quality === 'hd720') &&
+                  !fo.hasAudio,
+              )
+            : quality === 'medium'
+            ? videoFormats.find((fo) => fo.quality === 'medium' && !fo.hasAudio)
+            : videoFormats.find((fo) => fo.quality === 'small' && !fo.hasAudio);
+        const downloadAudioFormat = videoFormats.find((fo) => !fo.hasVideo);
+
+        const filePath = `${__dirname}/../../public/${uuidv4()}-final.mp4`;
+        const videoFilePath = `${__dirname}/../../public/${uuidv4()}-video.mp4`;
+        const audioFilePath = `${__dirname}/../../public/${uuidv4()}-audio.mp3`;
+        const title = info.videoDetails.title;
+
+        const videoPromise = new Promise((resolve, reject) => {
+          ytdl
+            .downloadFromInfo(info, {
+              format: downloadVideoFormat,
+            })
+            .pipe(createWriteStream(videoFilePath))
+            .on('end', () => {
+              console.log('Video download done');
+              resolve(null);
+            })
+            .on('error', (err: any) => {
+              reject(err);
+            });
+        });
+        const audioPromise = new Promise((resolve, reject) => {
+          ytdl
+            .downloadFromInfo(info, {
+              format: downloadAudioFormat,
+            })
+            .pipe(createWriteStream(audioFilePath))
+            .on('end', () => {
+              console.log('Audio download done');
+              resolve(null);
+            })
+            .on('error', (err: any) => {
+              reject(err);
+            });
+        });
+
+        return Promise.all([videoPromise, audioPromise])
+          .then(() => {
+            console.log('Download finished');
+            mergeStream(
+              createReadStream(videoFilePath),
+              createReadStream(audioFilePath),
+            )
+              .pipe(createWriteStream(filePath))
+              .on('finish', () => {
+                console.log('download done');
+                subscriber.next({ filePath, title });
+                subscriber.complete();
+              })
+              .on('error', (err) => {
+                subscriber.error(err);
+              });
+          })
+          .catch((err) => {
+            subscriber.error(err);
+          });
+      }),
+    );
   });
 }
 
@@ -123,7 +196,6 @@ export function downloadAudioFromPlaylist(
     catchError(handleErrors('getting playlist items URLs')),
   );
 }
-
 
 /**
  * Downloads video files from a playlist and archives them into a zip file.
@@ -210,7 +282,7 @@ export function getPlaylistItemsUrls(playlistId: string): Observable<string[]> {
         ),
       );
       /* Uses forkJoin to subscribe to all video urls, which only emits after all passed observables complete.
-                        Then it returns transformed urls and filters out any empty ones */
+                              Then it returns transformed urls and filters out any empty ones */
       return forkJoin(videoUrlObservables).pipe(
         map((urls: string[]) => {
           return urls.filter((url: string) => url !== '');

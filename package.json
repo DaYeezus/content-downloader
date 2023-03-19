@@ -15,7 +15,9 @@
     "dev:all": "pnpm --stream -r run dev",
     "dev:server": "pnpm nx dev server",
     "dev:client": "pnpm nx dev client",
-    "test:server" : "pnpm nx test server",
+    "build:server": "pnpm nx build server",
+    "build:client": "pnpm nx build client",
+    "test:server": "pnpm nx test server",
     "pretty:all": "prettier --write \"./**/**/*.{js,jsx,ts,tsx}\"",
     "pretty:apps": "pnpm --stream -r run pretty"
   }

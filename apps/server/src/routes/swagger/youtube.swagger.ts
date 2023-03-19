@@ -28,10 +28,14 @@
  *              schema:
  *                type: string
  *            - in: query
- *              name: isHighQuality
+ *              name: quality
  *              required: true
  *              schema:
- *                type: boolean
+ *                type: string
+ *                enum:
+ *                  - low
+ *                  - medium
+ *                  - high
  *          responses:
  *              200:
  *                  description: success

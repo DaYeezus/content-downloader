@@ -19,7 +19,7 @@ import { DownloadedAudio } from '../../interfaces/download.interface';
 import { redisClient } from '../../conf/redis.conf';
 import { config } from 'dotenv';
 import { youtubePlayListResponse } from '../../interfaces/youtube-playlist.interface';
-import { unlink, unlinkSync } from 'fs';
+import { unlinkSync } from 'fs';
 
 describe('Youtube service', function () {
   beforeAll(async () => {

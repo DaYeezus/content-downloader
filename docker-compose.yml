@@ -10,6 +10,30 @@ services:
     volumes:
       - redis-data:/data/
       - redis-conf:/usr/local/etc/redis/redis.conf
+    networks:
+      content-downloader:
+  server:
+    build:
+      context: apps/server/
+      dockerfile: Dockerfile
+      target: deploy
+    env_file:
+      - apps/server/.env
+    ports:
+      - '5000:5000'
+    volumes:
+      - ./apps/server:/app
+    environment:
+      - REDIS_URL=redis://redis
+    depends_on:
+      - redis
+    restart: always
+    networks:
+      content-downloader:
+
+networks:
+  content-downloader:
+    driver: bridge
 volumes:
   redis-data:
   redis-conf:

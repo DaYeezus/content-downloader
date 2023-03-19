@@ -1,11 +1,25 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
     "module": "commonjs",
-    "outDir": "./dist"
+    "target": "es6",
+    "lib": [
+      "es6",
+      "dom"
+    ],
+    "declaration": true,
+    "declarationDir": "./dist/types",
+    "typeRoots": [
+      "./node_modules/@types",
+      "./@types"
+    ]
   },
-  "include": ["."],
-  "exclude": ["dist", "node_modules", "**/*.spec.ts"]
+  "include": [
+    "./src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/__tests__/**/*"
+  ]
 }
