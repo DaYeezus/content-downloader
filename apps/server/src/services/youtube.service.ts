@@ -24,8 +24,8 @@ import { convertStreamToSong } from './convertor.service';
 
 import { getCachedVideo, getCachedYoutubePlaylistInfo } from './redis.service';
 import mergeStream from 'merge-stream';
-import { createReadStream, createWriteStream } from 'fs';
-import { FfmpegCommand } from 'fluent-ffmpeg';
+import { createReadStream, createWriteStream, PathLike, unlink } from 'fs';
+import Ffmpeg, { FfmpegCommand } from 'fluent-ffmpeg';
 import { Readable, Stream } from 'stream';
 
 export function getYoutubeContentInfo(videoId: string): Observable<videoInfo> {
@@ -42,78 +42,74 @@ export function downloadSingleVideo(
   videoId: string,
   quality: string,
 ): Observable<{ filePath: string; title: string }> {
+  console.log('hello');
   return new Observable((subscriber) => {
-    getCachedVideo(videoId).pipe(
-      mergeMap((info: videoInfo) => {
-        const videoFormats = info.formats;
-        const downloadVideoFormat =
-          quality === 'high'
-            ? videoFormats.find(
-                (fo) =>
-                  (fo.quality === 'hd1080' || fo.quality === 'hd720') &&
-                  !fo.hasAudio,
-              )
-            : quality === 'medium'
-            ? videoFormats.find((fo) => fo.quality === 'medium' && !fo.hasAudio)
-            : videoFormats.find((fo) => fo.quality === 'small' && !fo.hasAudio);
-        const downloadAudioFormat = videoFormats.find((fo) => !fo.hasVideo);
+    getCachedVideo(videoId)
+      .pipe(
+        mergeMap(async (info: videoInfo) => {
+          const videoFormats = info.formats;
+          const downloadVideoFormat =
+            quality === 'high'
+              ? videoFormats.find(
+                  (fo) =>
+                    (fo.quality === 'hd1080' || fo.quality === 'hd720') &&
+                    !fo.hasAudio,
+                )
+              : quality === 'medium'
+              ? videoFormats.find(
+                  (fo) => fo.quality === 'medium' && !fo.hasAudio,
+                )
+              : videoFormats.find(
+                  (fo) => fo.quality === 'small' && !fo.hasAudio,
+                );
+          const downloadAudioFormat = videoFormats.find((fo) => !fo.hasVideo);
 
-        const filePath = `${__dirname}/../../public/${uuidv4()}-final.mp4`;
-        const videoFilePath = `${__dirname}/../../public/${uuidv4()}-video.mp4`;
-        const audioFilePath = `${__dirname}/../../public/${uuidv4()}-audio.mp3`;
-        const title = info.videoDetails.title;
+          const filePath = `${__dirname}/../../public/${uuidv4()}-final.mp4`;
+          const videoFilePath = `${__dirname}/../../public/${uuidv4()}-video.mp4`;
+          const audioFilePath = `${__dirname}/../../public/${uuidv4()}-audio.mp3`;
+          const title = info.videoDetails.title;
 
-        const videoPromise = new Promise((resolve, reject) => {
-          ytdl
-            .downloadFromInfo(info, {
-              format: downloadVideoFormat,
-            })
-            .pipe(createWriteStream(videoFilePath))
-            .on('end', () => {
-              console.log('Video download done');
-              resolve(null);
-            })
-            .on('error', (err: any) => {
-              reject(err);
-            });
-        });
-        const audioPromise = new Promise((resolve, reject) => {
-          ytdl
-            .downloadFromInfo(info, {
-              format: downloadAudioFormat,
-            })
-            .pipe(createWriteStream(audioFilePath))
-            .on('end', () => {
-              console.log('Audio download done');
-              resolve(null);
-            })
-            .on('error', (err: any) => {
-              reject(err);
-            });
-        });
-
-        return Promise.all([videoPromise, audioPromise])
-          .then(() => {
-            console.log('Download finished');
-            mergeStream(
-              createReadStream(videoFilePath),
-              createReadStream(audioFilePath),
-            )
-              .pipe(createWriteStream(filePath))
-              .on('finish', () => {
-                console.log('download done');
-                subscriber.next({ filePath, title });
-                subscriber.complete();
+          const videoPromise = new Promise((resolve, reject) => {
+            const stream = ytdl
+              .downloadFromInfo(info, {
+                format: downloadVideoFormat,
               })
-              .on('error', (err) => {
-                subscriber.error(err);
+              .pipe(createWriteStream(videoFilePath));
+            stream
+              .on('finish', () => {
+                console.log('Video download done');
+                resolve(null);
+              })
+              .on('error', (err: any) => {
+                reject(err);
               });
-          })
-          .catch((err) => {
-            subscriber.error(err);
           });
-      }),
-    );
+          const audioPromise = new Promise((resolve, reject) => {
+            const stream = ytdl
+              .downloadFromInfo(info, {
+                format: downloadAudioFormat,
+              })
+              .pipe(createWriteStream(audioFilePath));
+            stream
+              .on('finish', () => {
+                console.log('Audio download done');
+                resolve(stream);
+              })
+              .on('error', (err: any) => {
+                reject(err);
+              });
+          });
+
+          await Promise.all([videoPromise, audioPromise])
+            .then(() => {
+              // TODO : merge two files with ffmpeg
+            })
+            .catch((err) => {
+              subscriber.error(err);
+            });
+        }),
+      )
+      .subscribe();
   });
 }
 

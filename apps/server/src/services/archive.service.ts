@@ -2,6 +2,7 @@ import archiver, { Archiver } from 'archiver';
 import {
   createReadStream,
   createWriteStream,
+  unlink,
   unlinkSync,
   WriteStream,
 } from 'fs';
@@ -89,7 +90,11 @@ export async function appendDownloadedSongsTOZip(
         });
       }),
     ).then(async () => {
-      downloadedAudios.map((audio) => unlinkSync(audio.filePath));
+      downloadedAudios.map((audio) =>
+        unlink(audio.filePath, (err: any) => {
+          if (err) throw new Error(err);
+        }),
+      );
       await archive.finalize();
       output.close();
     });
