@@ -1,7 +1,7 @@
-import { FfmpegCommand } from 'fluent-ffmpeg';
+import {FfmpegCommand} from 'fluent-ffmpeg';
 
 export interface DownloadedAudio {
-  data: FfmpegCommand;
-  filePath: string;
-  title: string;
+    data: FfmpegCommand;
+    filePath: string;
+    title: string;
 }

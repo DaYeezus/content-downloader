@@ -1,15 +1,9 @@
-import archiver, { Archiver } from 'archiver';
-import {
-  createReadStream,
-  createWriteStream,
-  unlink,
-  unlinkSync,
-  WriteStream,
-} from 'fs';
+import archiver, {Archiver} from 'archiver';
+import {createReadStream, createWriteStream, unlink, WriteStream,} from 'fs';
 import createHttpError from 'http-errors';
-import { join } from 'path';
-import { Observable } from 'rxjs';
-import { DownloadedAudio } from '../interfaces/download.interface';
+import {join} from 'path';
+import {Observable} from 'rxjs';
+import {DownloadedAudio} from '../interfaces/download.interface';
 
 /**
  * Downloads audio files from a playlist and archives them into a zip file.
@@ -18,45 +12,45 @@ import { DownloadedAudio } from '../interfaces/download.interface';
  * @returns {Observable<string>} - Observable that emits the path of the zip file when complete.
  */
 export function zipDownloadedAudios(
-  downloadedAudios: DownloadedAudio[],
-  isHighQuality: boolean,
-  album_name: string,
+    downloadedAudios: DownloadedAudio[],
+    isHighQuality: boolean,
+    album_name: string,
 ): Observable<string> {
-  return new Observable<string>((subscriber) => {
-    try {
-      // Creates a zip archive for the downloaded audio files
-      const zipFilePath = join(
-        __dirname,
-        '..',
-        '..',
-        'public',
-        `${album_name}.zip`,
-      );
-      const output = createWriteStream(zipFilePath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
-      archive.pipe(output);
-      appendDownloadedSongsTOZip(
-        downloadedAudios,
-        archive,
-        isHighQuality,
-        output,
-      );
-      output.on('close', () => {
-        subscriber.next(zipFilePath);
-        subscriber.complete();
-      });
+    return new Observable<string>((subscriber) => {
+        try {
+            // Creates a zip archive for the downloaded audio files
+            const zipFilePath = join(
+                __dirname,
+                '..',
+                '..',
+                'public',
+                `${album_name}.zip`,
+            );
+            const output = createWriteStream(zipFilePath);
+            const archive = archiver('zip', {zlib: {level: 9}});
+            archive.pipe(output);
+            appendDownloadedSongsTOZip(
+                downloadedAudios,
+                archive,
+                isHighQuality,
+                output,
+            );
+            output.on('close', () => {
+                subscriber.next(zipFilePath);
+                subscriber.complete();
+            });
 
-      archive.on('warning', (err: any) => {
-        subscriber.error(err);
-      });
+            archive.on('warning', (err: any) => {
+                subscriber.error(err);
+            });
 
-      archive.on('error', (err: any) => {
-        subscriber.error(err);
-      });
-    } catch (err) {
-      subscriber.error(err);
-    }
-  });
+            archive.on('error', (err: any) => {
+                subscriber.error(err);
+            });
+        } catch (err) {
+            subscriber.error(err);
+        }
+    });
 }
 
 /**
@@ -69,36 +63,36 @@ export function zipDownloadedAudios(
  * @returns {Void}
  */
 export async function appendDownloadedSongsTOZip(
-  downloadedAudios: DownloadedAudio[],
-  archive: Archiver,
-  isHighQuality: boolean,
-  output: WriteStream,
+    downloadedAudios: DownloadedAudio[],
+    archive: Archiver,
+    isHighQuality: boolean,
+    output: WriteStream,
 ): Promise<void> {
-  try {
-    await Promise.all(
-      downloadedAudios.map((audio) => {
-        return new Promise((res, rej) => {
-          audio.data.on('end', () => {
-            archive.append(createReadStream(audio.filePath), {
-              name: `${audio.title}.${isHighQuality ? 'flac' : 'mp3'}`,
-            });
-            res(null);
-          });
-          audio.data.on('error', (error: any) => {
-            rej(error);
-          });
+    try {
+        await Promise.all(
+            downloadedAudios.map((audio) => {
+                return new Promise((res, rej) => {
+                    audio.data.on('end', () => {
+                        archive.append(createReadStream(audio.filePath), {
+                            name: `${audio.title}.${isHighQuality ? 'flac' : 'mp3'}`,
+                        });
+                        res(null);
+                    });
+                    audio.data.on('error', (error: any) => {
+                        rej(error);
+                    });
+                });
+            }),
+        ).then(async () => {
+            downloadedAudios.map((audio) =>
+                unlink(audio.filePath, (err: any) => {
+                    if (err) throw new Error(err);
+                }),
+            );
+            await archive.finalize();
+            output.close();
         });
-      }),
-    ).then(async () => {
-      downloadedAudios.map((audio) =>
-        unlink(audio.filePath, (err: any) => {
-          if (err) throw new Error(err);
-        }),
-      );
-      await archive.finalize();
-      output.close();
-    });
-  } catch (err: any) {
-    throw createHttpError(err);
-  }
+    } catch (err: any) {
+        throw createHttpError(err);
+    }
 }
