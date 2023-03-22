@@ -127,10 +127,14 @@
  *                schema:
  *                  type: string
  *              - in: query
- *                name: isHighQuality
+ *                name: quality
  *                required: true
  *                schema:
- *                  type: boolean
+ *                  type: string
+ *                  enum:
+ *                    - low
+ *                    - medium
+ *                    - high
  *              - in: query
  *                name: albumName
  *                required: true

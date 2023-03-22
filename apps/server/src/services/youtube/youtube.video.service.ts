@@ -4,8 +4,8 @@ import ytdl, {videoInfo} from "ytdl-core";
 import {v4 as uuidv4} from "uuid";
 import {PassThrough} from "stream";
 import createHttpError from "http-errors";
-import {DownloadedAudio} from "../../interfaces/download.interface";
-import {zipDownloadedAudios} from "../archive.service";
+import {DownloadedAudio, DownloadedVideo} from "../../interfaces/download.interface";
+import {zipDownloadedContent} from "../archive.service";
 import {getPlaylistItemsUrls} from "./youtube.service";
 import {downloadSingleAudio} from "./youtube.audio.service";
 import {createWriteStream} from "fs";
@@ -14,7 +14,7 @@ import {mergeAudioWithVideo} from "../convertor.service";
 export function downloadSingleVideo(
     videoId: string,
     quality: string,
-): Observable<{ filePath: string; title: string }> {
+): Observable<DownloadedVideo> {
     return new Observable((subscriber) => {
         getCachedVideo(videoId)
             .pipe(
@@ -32,10 +32,9 @@ export function downloadSingleVideo(
                             format: downloadAudioFormat,
                         })
                     mergeAudioWithVideo(audioStream, videoStream).pipe(result)
-                    result.pipe(createWriteStream(filePath)).on("finish", () => {
-                        subscriber.next({filePath, title})
-                        subscriber.complete()
-                    })
+                    const data = result.pipe(createWriteStream(filePath))
+                    subscriber.next({data,filePath,title})
+                    subscriber.complete()
                 }),
             )
             .subscribe();
@@ -67,13 +66,13 @@ function chooseFormat(info: videoInfo, quality: string) {
  * Downloads video files from a playlist and archives them into a zip file.
  *
  * @param playlistId
- * @param {boolean} isHighQuality - Whether to download high quality audio or not.
+ * @param quality
  * @param albumName
  * @returns {Observable<string>} - Observable that emits the path of the zip file when complete.
  */
 export function downloadVideoFromPlaylist(
     playlistId: string,
-    isHighQuality: boolean,
+    quality: string,
     albumName: string,
 ): Observable<string> {
     /**
@@ -87,13 +86,13 @@ export function downloadVideoFromPlaylist(
     return getPlaylistItemsUrls(playlistId).pipe(
         switchMap((videoIds) =>
             from(videoIds).pipe(
-                mergeMap((videoId) => downloadSingleAudio(videoId, isHighQuality)),
+                mergeMap((videoId) => downloadSingleVideo(videoId,quality)),
                 toArray(),
                 catchError(handleErrors('downloading audios')),
             ),
         ),
-        mergeMap((downloadedAudios: DownloadedAudio[]) =>
-            zipDownloadedAudios(downloadedAudios, isHighQuality, albumName).pipe(
+        mergeMap((downloadedVideos: DownloadedVideo[]) =>
+            zipDownloadedContent(downloadedVideos, quality, albumName).pipe(
                 catchError(handleErrors('zipping downloaded audios')),
             ),
         ),

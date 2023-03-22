@@ -1,7 +1,7 @@
 import {catchError, from, mergeMap, Observable, switchMap, toArray} from "rxjs";
 import createHttpError from "http-errors";
 import {DownloadedAudio} from "../../interfaces/download.interface";
-import {zipDownloadedAudios} from "../archive.service";
+import {zipDownloadedContent} from "../archive.service";
 import {getPlaylistItemsUrls} from "./youtube.service";
 import {getCachedVideo} from "../redis.service";
 import ytdl from "ytdl-core";
@@ -38,7 +38,7 @@ export function downloadAudioFromPlaylist(
             ),
         ),
         mergeMap((downloadedAudios: DownloadedAudio[]) =>
-            zipDownloadedAudios(downloadedAudios, isHighQuality, albumName).pipe(
+            zipDownloadedContent(downloadedAudios, isHighQuality, albumName).pipe(
                 catchError(handleErrors('zipping downloaded audios')),
             ),
         ),

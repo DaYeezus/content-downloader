@@ -5,8 +5,12 @@ export const downloadAudioSchema = z.object({
   isHighQuality: z.string().default('true'),
 });
 
-export const downloadContentFromPlaylistSchema = z.object({
+export const downloadAudioFromPlaylistSchema = z.object({
   isHighQuality: z.string().default('true'),
+  albumName: z.string(),
+});
+export const downloadVideoFromPlaylistSchema = z.object({
+  quality: z.enum(['high', 'low', 'medium']),
   albumName: z.string(),
 });
 

@@ -1,11 +1,12 @@
 import {NextFunction, Request, Response} from 'express';
 import * as fs from 'fs';
 import {
-  downloadAudioSchema,
-  downloadContentFromPlaylistSchema,
-  downloadVideoSchema,
-  playlistIdSchema,
-  videoIdSchema,
+    downloadAudioSchema,
+    downloadAudioFromPlaylistSchema,
+    downloadVideoFromPlaylistSchema,
+    downloadVideoSchema,
+    playlistIdSchema,
+    videoIdSchema,
 } from 'validators';
 import {videoInfo} from 'ytdl-core';
 import {youtubePlayListResponse} from '../interfaces/youtube-playlist.interface';
@@ -88,17 +89,19 @@ export async function downloadVideo(
         if (!videoId || !quality) throw new BadRequest('Please insert all params');
 
         downloadSingleVideo(videoId, quality).subscribe({
-            next({filePath, title}) {
-                res.download(filePath, title, (err) => {
-                    if (err) {
-                        console.error(err);
-                    }
-                    fs.unlink(filePath, (err) => {
+            next({data,filePath, title}) {
+                data.on("finish", () => {
+                    res.download(filePath, title, (err) => {
                         if (err) {
                             console.error(err);
                         }
+                        fs.unlink(filePath, (err) => {
+                            if (err) {
+                                console.error(err);
+                            }
+                        });
                     });
-                });
+                })
             },
             error: (err) => next(err),
         });
@@ -140,7 +143,7 @@ export async function downloadAudioPlaylist(
 ) {
     try {
         const {isHighQuality, albumName} =
-            await downloadContentFromPlaylistSchema.parseAsync(req.query);
+            await downloadAudioFromPlaylistSchema.parseAsync(req.query);
         const {playlistId} = await playlistIdSchema.parseAsync(req.params);
 
         if (!playlistId) throw new BadRequest('Please insert valid youtube video');
@@ -149,7 +152,7 @@ export async function downloadAudioPlaylist(
         if (!playlistId || !isHighQuality || !albumName)
             throw new BadRequest('Please insert all params');
 
-        downloadVideoFromPlaylist(playlistId, quality, albumName).subscribe({
+        downloadAudioFromPlaylist(playlistId, quality, albumName).subscribe({
             next(value) {
                 res.writeHead(200, {
                     'Content-Disposition': contentDisposition(albumName), // Mask non-ANSI chars
@@ -182,16 +185,11 @@ export async function downloadVideoPlaylist(
     next: NextFunction,
 ) {
     try {
-        const {isHighQuality, albumName} =
-            await downloadContentFromPlaylistSchema.parseAsync(req.query);
+        const {quality, albumName} =
+            await downloadVideoFromPlaylistSchema.parseAsync(req.query);
         const {playlistId} = await playlistIdSchema.parseAsync(req.params);
-
-        if (!playlistId) throw new BadRequest('Please insert valid youtube video');
-
-        const quality = isHighQuality === 'true';
-        if (!playlistId || !isHighQuality || !albumName)
-            throw new BadRequest('Please insert all params');
-        downloadAudioFromPlaylist(playlistId, quality, albumName).subscribe({
+        if (!playlistId || !quality || !albumName) throw new BadRequest('Please insert all params');
+        downloadVideoFromPlaylist(playlistId, quality, albumName).subscribe({
             next(value) {
                 res.writeHead(200, {
                     'Content-Disposition': contentDisposition(albumName), // Mask non-ANSI chars
