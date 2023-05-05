@@ -7,7 +7,7 @@ import {
     downloadVideoSchema,
     playlistIdSchema,
     videoIdSchema,
-} from 'validators';
+} from '../validators/index';
 import {videoInfo} from 'ytdl-core';
 import {youtubePlayListResponse} from '../interfaces/youtube-playlist.interface';
 import {getCachedVideo, getCachedYoutubePlaylistInfo,} from '../services/redis.service';

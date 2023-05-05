@@ -34,14 +34,14 @@ app.use('/api', router);
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 app.use(notFoundHandler);
 app.use(serverErrorHandler);
-const server = app.listen(process.env.APPLICATION_PORT, () => {
-    console.log(`Listening on ${process.env.APPLICATION_PORT}`);
+const server = app.listen(5000, () => {
+    console.log(`Listening on 5000`);
 });
 redisClient
     .connect()
     .then(() => {
     })
-    .catch((err) => {
+    .catch((err:any) => {
         console.log(err);
     });
 process.on('SIGINT', () => {

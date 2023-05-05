@@ -1,25 +1,23 @@
-FROM node:18-alpine AS base
-
-RUN npm i -g pnpm
-
-FROM base AS dependencies
-
+FROM node:18-alpine As development
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install
+COPY package.json yarn.lock ./
 
-FROM base AS build
+RUN yarn install
 
-WORKDIR /app
 COPY . .
-COPY --from=dependencies /app/node_modules ./node_modules
-RUN pnpm build
-RUN pnpm prune --prod
-
-FROM base AS deploy
+EXPOSE 5000
+CMD ["yarn" , "dev"]
+FROM node:18-alpine as production
+ARG NODE_ENV=production
+ENV NODE_ENV=${NODE_ENV}
 
 WORKDIR /app
-COPY --from=build /app/dist/ ./dist/
-COPY --from=build /app/node_modules ./node_modules
 
-CMD [ "node", "dist/index.js" ]
+COPY package.json yarn.lock ./
+
+RUN yarn  install --only=production
+RUN yarn build 
+COPY . .
+
+EXPOSE 5000
+CMD ["yarn" , "run" , "start"]

@@ -76,7 +76,7 @@ export function chooseDownloadFormat(
     (quality === 'medium' && ['medium']) || ['small'];
 
   const downloadVideoFormat = formats.find(
-    ({ quality, hasAudio }) => videoFilter.includes(quality) && !hasAudio,
+    ({ quality:any, hasAudio }) => videoFilter.includes(quality) && !hasAudio,
   );
 
   const downloadAudioFormat = formats.find(({ hasVideo }) => !hasVideo);
